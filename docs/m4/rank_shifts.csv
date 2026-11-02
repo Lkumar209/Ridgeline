@@ -1,0 +1,7 @@
+label,spearman,moved,threshold,max_move,top_kept,n_sites,sentence
+proxy_demand_x0.7,0.9335834896810509,15,5,9,7,40,"If the proxy demand charge (23 sites above 200 kW) were 30% lower: the order changes substantially. 15 of 40 sites move 5 or more places, and 7 of the top 10 stay in the top 10."
+proxy_demand_x1.3,0.9431519699812384,9,5,8,8,40,"If the proxy demand charge (23 sites above 200 kW) were 30% higher: the order changes substantially. 9 of 40 sites move 5 or more places, and 8 of the top 10 stay in the top 10."
+all_demand_x0.7,0.9863039399624767,1,5,5,9,40,"If every site's demand charge were 30% lower: only a few sites change places. 1 of 40 sites moves 5 or more places, and 9 of the top 10 stay in the top 10."
+all_demand_x1.3,0.9923076923076924,0,5,3,9,40,"If every site's demand charge were 30% higher: the order barely changes. 0 of 40 sites move 5 or more places, and 9 of the top 10 stay in the top 10."
+churn_on_vs_off,0.6431519699812384,24,5,19,3,40,"Adding tenant churn: the order changes substantially. 24 of 40 sites move 5 or more places, and 3 of the top 10 stay in the top 10."
+seed_stability,0.9932457786116325,3,3,4,10,40,"Changing the random seed: only a few sites change places. 3 of 40 sites move 3 or more places, and 10 of the top 10 stay in the top 10."

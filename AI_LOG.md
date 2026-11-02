@@ -178,3 +178,38 @@ it was caught. Newest milestone at the bottom.
 2. *The hourly-vs-15-min comparison is a trade-off, not a win.* On the new list, 15-min slots
    reduce bias but slightly widen the median absolute error. The doc now presents both sides. The
    M2 entry above records the earlier numbers as history (original site list).
+
+## M4: 15-year Monte Carlo and robustness ranking
+
+**Key prompts**
+- Monte Carlo with fixed seeds; P10/P50/P90 NPV, P(NPV>0), robustness score, tornado sensitivity;
+  churn as per-site survival risk; demand charge swept ±30% to test the proxy tariff; one
+  plain-language sentence each for churn and tariff sensitivity; a stated runtime budget.
+
+**What was generated**
+- `scenarios/`, `ranking/`, `results.py`, `ridgeline rank`, `scripts/report_ranking.py` (generated
+  `docs/m4/`), `docs/m4_ranking.md`, ADR-011, and 27 new tests (unit, property, golden, end-to-end).
+- Capex and O&M sourced from NREL ATB 2024 on OEDI (checked the parquet rows), not invented.
+
+**What was wrong or rejected, and how it was caught**
+1. *Churn raised NPV.* My first model stopped O&M when a tenant left. Most sites save less than their
+   O&M, so leaving early *helped*. Caught by the generated sentence printing "lowers … by $-2,718"
+   (a negative drop). Fixed the semantics (savings stop, O&M continues), and added a property test
+   that churn never raises NPV when savings are non-negative.
+2. *A canned sentence contradicted its numbers* ("barely its place … 15 of 40 sites move"). Fixed
+   by choosing every verdict word from the counts, and by fixing the connector logic.
+3. *Rank shifts were partly Monte Carlo noise.* Comparing 2,000 vs 8,000 draws showed P10 moving a
+   median $1,071, about twice the gap between neighboring sites. Caught by a convergence check I ran
+   before writing the doc. Fixes: default 8,000 draws; a second-seed stability run on every
+   `rank`; "moved" counted only above that noise (5+ places).
+4. *Vacuous end-to-end test.* Each one-month fixture block was idle under the causal first-month
+   rule, so all savings were 0. Caught by a guard assertion that some demand savings are positive.
+   Fixed by simulating the two fortnights as one series.
+5. *Wrong test expectation:* I asserted energy savings are negative (losses). Under a TOU fixture,
+   arbitrage makes them positive. The sign is now asserted only under a single energy price.
+6. *An overstated claim in the doc draft:* "perfect foresight is 2–3× higher". The data says a median
+   1.95× (range 1.6–3.6×). Caught by cross-checking every quoted number against the CSVs before
+   committing.
+7. *A silent no-op edit:* a `str.replace` without an assertion left a table header saying "3+" after
+   the threshold became 5. Caught by ruff flagging the now-unused variable. Edits to existing code
+   now assert their match.

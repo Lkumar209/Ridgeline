@@ -55,6 +55,24 @@ list grows each milestone.
   as idle. This assumes the operator can tell, which slightly flatters the controller.
 - **No export, and no wholesale or demand-response revenue.**
 
+## Cash flow and ranking (M4)
+- **Savings come from the practical controller.** It captures a median ~51% of the perfect-foresight
+  bound on the dev subset, so the M4 NPVs are a conservative view of what a better controller could
+  earn.
+- **Demand savings scale linearly with the demand-charge multiplier and with remaining capacity.**
+  Dispatch is not re-simulated per draw. A degraded battery is assumed to save proportionally less,
+  which is a simplification for peak shaving.
+- **Year-to-year load variation is synthetic noise** (10% lognormal), because there is one weather year.
+- **Churn ends savings permanently, with no re-tenanting and no battery resale.** Hazards by building
+  type are relative guesses.
+- **One generic upfront incentive fraction (0–30%)** stands in for real programs (tax credits,
+  state programs), whose terms and eligibility are not modeled.
+- **Costs mix sources:** ATB 2022$ costs are converted to 2025$ with an assumed ×1.10 factor; the
+  tariff is 2025.
+- **Rank positions within about 4 places are ties** (Monte Carlo noise between seeds).
+- **Imputation error is not propagated.** The current sites have no real gaps; real meter data would
+  need the M2 error distribution added.
+
 ## MECo G-2 tariff (`data/tariffs/meco_g2_sema.json`)
 - **Delivery service only.** The record's `servicetype` is Delivery. Supply (basic service) energy
   costs are excluded, so round-trip losses and energy arbitrage are under-valued

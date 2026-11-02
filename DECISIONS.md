@@ -215,3 +215,44 @@ found, and the MECo G-3 records found are 115 kV service.
 
 **Consequence.** The M2 imputation results (`docs/m2_imputation.md`) were computed on the
 original site list. Rerunning `scripts/evaluate_imputation.py` refreshes them.
+
+## ADR-011: Monte Carlo cash flow and robustness ranking (M4)
+
+**Decision.**
+- **Score:** rank by **P10 NPV** (robustness), and show P50 rank, P(NPV>0) and breakeven capex
+  alongside.
+- **NPV model:** one vectorized function (sites × draws × years) serves both the Monte Carlo and the
+  deterministic tornado, so there is one cash-flow formula to review.
+- **Shared draws:** global uncertain inputs are drawn once and shared by all sites. Per-site noise and
+  churn are seeded by `(seed, bldg_id)`. Churn departure years come from fixed uniforms by inverse
+  CDF, so every scenario comparison reuses the same randomness.
+- **Churn semantics:** when the tenant leaves, savings stop and the fixed O&M continues.
+- **Proxy sweep:** the demand-charge sweep (×0.7–1.3) applies to proxy-tariff sites only, with an
+  all-sites contrast.
+- **Noise-aware "moved":** a site counts as having moved only if it shifts more places than a
+  second random seed moves any site (5+ places with 8,000 draws).
+- **Sources and caching:** capex and O&M from NREL ATB 2024 (sourced); other inputs ASSUMPTION
+  with ranges. Simulated savings are cached under a fingerprint.
+
+**Why.**
+- **P10 rewards sites that hold up in bad futures.** That is what "robust" means here, and it is easy
+  to say in one sentence.
+- **Shared draws make site comparisons and scenario comparisons attributable.**
+- **Churn semantics:** my first version ended O&M at churn too. With savings below O&M, that made
+  churn *raise* NPV, which is backwards. The battery stays with the building, so its maintenance
+  contract continues.
+- **Noise-aware "moved":** with 40 sites a few hundred dollars apart, a fixed "3 places" threshold
+  counted Monte Carlo noise as a result.
+
+**Rejected.**
+- **Ranking by mean NPV:** it hides tail risk, which is the brief's point.
+- **A composite robustness score:** harder to explain, and P10 alone captures the question.
+- **Triangular or fitted distributions:** uniform ranges are the honest choice when the bounds are
+  all we know.
+- **Re-simulating dispatch per draw:** about 8 s per site-year; demand savings are scaled
+  analytically instead (exact for the threshold controller, except for months the idle guard
+  switches off).
+
+**Consequence.** No site pays back at central costs; the ranking orders sites by how little they
+lose,
+and how reliably. Cost inputs decide *whether* storage pays; churn and the proxy tariff decide *where*.
