@@ -196,11 +196,13 @@ tenant_churn_multiplier:
 
 tenant_churn_hazard_MediumOffice:
   value: 0.06
-  unit: probability per year that the host tenant leaves and the project ends
+  unit: probability per year that the host tenant leaves
   source: ASSUMPTION
   notes: >-
-    When the tenant leaves, savings and O&M stop and the battery has no resale value (conservative:
-    a new tenant could keep it). Hazards are relative guesses by building type, not measured rates.
+    When the tenant leaves, the building's load (and so the savings) is assumed gone for the rest
+    of the project. The battery stays with the building and its fixed O&M contract continues, with
+    no resale value. That is conservative, since a new tenant could restore savings. Hazards are
+    relative guesses by building type, not measured rates.
 
 tenant_churn_hazard_RetailStripmall:
   value: 0.10
