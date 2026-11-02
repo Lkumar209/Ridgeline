@@ -48,6 +48,11 @@ class Site(_Frozen):
     def peak_to_average(self) -> float:
         return self.peak_kw / self.mean_kw
 
+    @property
+    def mean_monthly_kwh(self) -> float:
+        """Average monthly consumption (annual kWh / 12), used for tariff usage limits."""
+        return self.mean_kw * 8760 / 12
+
 
 class LoadProfile(_Frozen):
     """A regular, gap-free interval load series.
@@ -160,6 +165,8 @@ class Tariff(_Frozen):
     flat_demand_usd_per_kw_by_month: list[float] | None = None
     min_peak_kw: float | None = None
     max_peak_kw: float | None = None
+    min_monthly_kwh: float | None = None
+    max_monthly_kwh: float | None = None
     ratchet_ignored: bool = False
     demand_converted_from_kva_at_pf: float | None = Field(
         default=None,
@@ -182,10 +189,17 @@ class Tariff(_Frozen):
             raise ValueError("tariff has no demand charge; peak shaving would have no value")
         return self
 
-    def is_eligible(self, peak_kw: float) -> bool:
-        lo = self.min_peak_kw if self.min_peak_kw is not None else -math.inf
-        hi = self.max_peak_kw if self.max_peak_kw is not None else math.inf
-        return lo <= peak_kw <= hi
+    def is_eligible(self, peak_kw: float, monthly_kwh: float) -> bool:
+        """Both the demand limits and the monthly-usage limits must hold (None = no limit)."""
+
+        def within(value: float, lo: float | None, hi: float | None) -> bool:
+            low = lo if lo is not None else -math.inf
+            high = hi if hi is not None else math.inf
+            return low <= value <= high
+
+        return within(peak_kw, self.min_peak_kw, self.max_peak_kw) and within(
+            monthly_kwh, self.min_monthly_kwh, self.max_monthly_kwh
+        )
 
 
 class BatterySpec(_Frozen):

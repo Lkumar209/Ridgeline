@@ -179,3 +179,22 @@ def test_coverage_report(record: dict[str, Any]) -> None:
     assert coverage.matched == {"cs-1": "TEST-FIXTURE-TOU"}
     assert coverage.unmatched == ["cs-2"]
     assert not coverage.complete
+
+
+def test_usage_limits_are_parsed_and_enforced(record: dict[str, Any]) -> None:
+    record["peakkwhusagemin"] = 10_000
+    tariff = parse_urdb_record(record, "x")
+    assert tariff.min_monthly_kwh == 10_000
+    small = _site().model_copy(update={"mean_kw": 10.0})  # 7,300 kWh/month
+    assert small.mean_monthly_kwh == pytest.approx(7_300)
+    with pytest.raises(TariffMatchError, match="7,300 kWh/month"):
+        match_tariff(small, [tariff])
+    assert match_tariff(_site(), [tariff]) == tariff  # 100 kW mean = 73,000 kWh/month
+
+
+def test_peak_limit_is_inclusive(record: dict[str, Any]) -> None:
+    record["peakkwcapacitymax"] = 200
+    tariff = parse_urdb_record(record, "x")
+    assert match_tariff(_site(peak_kw=200.0), [tariff]) == tariff
+    with pytest.raises(TariffMatchError):
+        match_tariff(_site(peak_kw=200.01), [tariff])

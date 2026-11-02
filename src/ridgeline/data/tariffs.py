@@ -73,6 +73,8 @@ def parse_urdb_record(
         flat_demand_usd_per_kw_by_month=_flat_demand(record, divisor),
         min_peak_kw=record.get("peakkwcapacitymin"),
         max_peak_kw=record.get("peakkwcapacitymax"),
+        min_monthly_kwh=record.get("peakkwhusagemin"),
+        max_monthly_kwh=record.get("peakkwhusagemax"),
         ratchet_ignored=any(float(p) > 0 for p in record.get("demandratchetpercentage") or []),
         demand_converted_from_kva_at_pf=power_factor if demand_unit == "kVA" else None,
         is_test_fixture=bool(record.get("ridgeline_test_fixture", False)),
@@ -83,8 +85,13 @@ def parse_urdb_record(
 
 
 def eligible_tariffs(site: Site, tariffs: list[Tariff]) -> list[Tariff]:
-    """Tariffs for the site's utility whose kW limits include the site's (pre-battery) peak."""
-    return [t for t in tariffs if t.eiaid == site.utility_eiaid and t.is_eligible(site.peak_kw)]
+    """Tariffs for the site's utility whose limits include the site's pre-battery annual peak
+    and its average monthly usage (DECISIONS.md ADR-009)."""
+    return [
+        t
+        for t in tariffs
+        if t.eiaid == site.utility_eiaid and t.is_eligible(site.peak_kw, site.mean_monthly_kwh)
+    ]
 
 
 def match_tariff(site: Site, tariffs: list[Tariff]) -> Tariff:
@@ -94,8 +101,8 @@ def match_tariff(site: Site, tariffs: list[Tariff]) -> Tariff:
         return matches[0]
     if not matches:
         raise TariffMatchError(
-            f"site {site.site_id} (EIA {site.utility_eiaid}, peak {site.peak_kw:.0f} kW) "
-            "matches no tariff"
+            f"site {site.site_id} (EIA {site.utility_eiaid}, peak {site.peak_kw:.0f} kW, "
+            f"{site.mean_monthly_kwh:,.0f} kWh/month) matches no tariff"
         )
     ids = ", ".join(t.tariff_id for t in matches)
     raise TariffMatchError(f"site {site.site_id} matches several tariffs: {ids}")
