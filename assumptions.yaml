@@ -35,6 +35,14 @@ battery_soc_max:
   source: ASSUMPTION
   notes: Headroom at the top of charge. Placeholder.
 
+power_factor_for_kva_demand:
+  value: 0.90
+  unit: fraction (kW / kVA)
+  source: ASSUMPTION
+  notes: >-
+    Used only to convert $/kVA demand charges to $/kW (rate / PF). ComStock gives real power
+    only, so a site's actual power factor is unknown. Placeholder for typical commercial loads.
+
 comstock_load_data:
   value: ComStock 2024 release 2, AMY2018, upgrade 0 (baseline)
   unit: dataset

@@ -161,6 +161,12 @@ class Tariff(_Frozen):
     min_peak_kw: float | None = None
     max_peak_kw: float | None = None
     ratchet_ignored: bool = False
+    demand_converted_from_kva_at_pf: float | None = Field(
+        default=None,
+        gt=0,
+        le=1,
+        description="Set when demand rates were $/kVA and converted to $/kW (rate / PF).",
+    )
     is_test_fixture: bool = False
 
     @field_validator("flat_demand_usd_per_kw_by_month")

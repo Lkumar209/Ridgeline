@@ -9,11 +9,13 @@ import pytest
 
 from ridgeline.data.schemas import Site
 from ridgeline.data.tariffs import (
+    TariffMatchError,
     UnsupportedTariffError,
-    assign_tariff,
     load_tariff_dir,
     load_tariff_file,
+    match_tariff,
     parse_urdb_record,
+    tariff_coverage,
 )
 
 
@@ -79,10 +81,42 @@ def test_per_day_fixed_charge_is_refused(record: dict[str, Any]) -> None:
         parse_urdb_record(record, "x")
 
 
-def test_non_kw_demand_unit_is_refused(record: dict[str, Any]) -> None:
-    record["demandunits"] = "kVA"
-    with pytest.raises(UnsupportedTariffError, match="kVA"):
+def test_unknown_demand_unit_is_refused(record: dict[str, Any]) -> None:
+    record["demandunits"] = "hp"
+    with pytest.raises(UnsupportedTariffError, match="hp"):
         parse_urdb_record(record, "x")
+
+
+def test_kva_demand_without_power_factor_is_refused(record: dict[str, Any]) -> None:
+    record["demandunits"] = record["flatdemandunit"] = "kVA"
+    with pytest.raises(UnsupportedTariffError, match="no power factor"):
+        parse_urdb_record(record, "x")
+
+
+def test_kva_demand_converts_to_kw_with_power_factor(record: dict[str, Any]) -> None:
+    """$/kVA x (kW / PF) = ($/kVA / PF) x kW, for both TOU and flat demand charges."""
+    record["demandunits"] = record["flatdemandunit"] = "kVA"
+    tariff = parse_urdb_record(record, "x", power_factor=0.8)
+    assert tariff.demand_converted_from_kva_at_pf == 0.8
+    assert tariff.demand_tou_usd_per_kw is not None
+    assert tariff.demand_tou_usd_per_kw.rate_at(7, 15, False) == pytest.approx(5.0 / 0.8)
+    assert tariff.flat_demand_usd_per_kw_by_month is not None
+    assert tariff.flat_demand_usd_per_kw_by_month[0] == pytest.approx(10.0 / 0.8)
+    # Energy rates are untouched by the conversion.
+    assert tariff.energy_usd_per_kwh.rate_at(1, 12, False) == 0.20
+
+
+def test_kw_tariff_ignores_power_factor(record: dict[str, Any]) -> None:
+    tariff = parse_urdb_record(record, "x", power_factor=0.8)
+    assert tariff.demand_converted_from_kva_at_pf is None
+    assert tariff.flat_demand_usd_per_kw_by_month is not None
+    assert tariff.flat_demand_usd_per_kw_by_month[0] == 10.0
+
+
+def test_mixed_kw_and_kva_is_refused(record: dict[str, Any]) -> None:
+    record["flatdemandunit"] = "kVA"
+    with pytest.raises(UnsupportedTariffError, match="mixed"):
+        parse_urdb_record(record, "x", power_factor=0.9)
 
 
 def test_missing_source_url_is_an_error(record: dict[str, Any]) -> None:
@@ -117,15 +151,31 @@ def test_real_tariff_dir_loads() -> None:
         assert not tariff.is_test_fixture
 
 
-def test_assign_by_utility_and_size(record: dict[str, Any]) -> None:
+def test_match_by_utility_and_size(record: dict[str, Any]) -> None:
     tariff = parse_urdb_record(record, "x")
-    assert assign_tariff(_site(), [tariff]) == tariff
-    assert assign_tariff(_site(peak_kw=1500.0), [tariff]) is None
-    assert assign_tariff(_site(eiaid=11804), [tariff]) is None
+    assert match_tariff(_site(), [tariff]) == tariff
 
 
-def test_assign_refuses_ambiguous_match(record: dict[str, Any]) -> None:
+@pytest.mark.parametrize(("peak", "eiaid"), [(1500.0, 99999), (300.0, 11804)])
+def test_match_fails_loudly_when_nothing_matches(
+    record: dict[str, Any], peak: float, eiaid: int
+) -> None:
+    tariff = parse_urdb_record(record, "x")
+    with pytest.raises(TariffMatchError, match="matches no tariff"):
+        match_tariff(_site(peak_kw=peak, eiaid=eiaid), [tariff])
+
+
+def test_match_fails_loudly_on_two_matches(record: dict[str, Any]) -> None:
     a = parse_urdb_record(record, "a")
     b = a.model_copy(update={"tariff_id": "other"})
-    with pytest.raises(ValueError, match="several tariffs"):
-        assign_tariff(_site(), [a, b])
+    with pytest.raises(TariffMatchError, match="several tariffs"):
+        match_tariff(_site(), [a, b])
+
+
+def test_coverage_report(record: dict[str, Any]) -> None:
+    tariff = parse_urdb_record(record, "x")
+    sites = [_site(), _site(peak_kw=1500.0).model_copy(update={"site_id": "cs-2"})]
+    coverage = tariff_coverage(sites, [tariff])
+    assert coverage.matched == {"cs-1": "TEST-FIXTURE-TOU"}
+    assert coverage.unmatched == ["cs-2"]
+    assert not coverage.complete

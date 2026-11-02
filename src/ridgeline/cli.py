@@ -9,11 +9,12 @@ from pathlib import Path
 import httpx
 import typer
 
+from ridgeline.assumptions import load_assumptions
 from ridgeline.config import Settings, load_settings
 from ridgeline.data import comstock
 from ridgeline.data.schemas import Site
 from ridgeline.data.sites import write_sites
-from ridgeline.data.tariffs import assign_tariff, load_tariff_dir
+from ridgeline.data.tariffs import load_tariff_dir, tariff_coverage
 
 app = typer.Typer(help="Ridgeline: rank sites for battery peak shaving (illustrative).")
 
@@ -55,11 +56,21 @@ def _report(settings: Settings, sites: list[Site], targets: list[Site], cache_di
         ("PAR tier", Counter(s.par_tier for s in sites)),
     ):
         typer.echo(f"  {label}: " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
-    tariffs = load_tariff_dir(settings.resolve(settings.paths.tariffs_dir))
-    covered = sum(assign_tariff(s, tariffs) is not None for s in sites)
-    typer.echo(f"  tariffs loaded: {len(tariffs)}; sites with a matching tariff: {covered}")
+    tariffs = load_tariff_dir(settings.resolve(settings.paths.tariffs_dir), _power_factor())
+    coverage = tariff_coverage(sites, tariffs)
+    typer.echo(
+        f"  tariffs loaded: {len(tariffs)}; sites matched: {len(coverage.matched)}, "
+        f"unmatched: {len(coverage.unmatched)}, ambiguous: {len(coverage.ambiguous)}"
+    )
     size_mb = sum(p.stat().st_size for p in cache_dir.rglob("*") if p.is_file()) / 1e6
     typer.echo(f"  cache size: {size_mb:.1f} MB at {cache_dir}")
+
+
+def _power_factor() -> float:
+    value = load_assumptions()["power_factor_for_kva_demand"].value
+    if isinstance(value, str):
+        raise ValueError("power_factor_for_kva_demand must be numeric")
+    return float(value)
 
 
 def _not_yet(milestone: str) -> None:
