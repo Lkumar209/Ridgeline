@@ -159,3 +159,22 @@ it was caught. Newest milestone at the bottom.
 6. *Rejected: re-selecting all 40 sites from 11804 only.* It would have silently reshuffled the 35
    kept sites and the dev subset. The replacement uses its own seeded draw, and a test asserts the
    other sites are byte-identical.
+
+## M4 prelude: CI and the M2 refresh
+
+**What was generated**
+- `.github/workflows/check.yml`, which runs `make check` with uv. Verified offline: data/cache moved
+  aside, network proxy pointed at a dead port, `UV_OFFLINE=1`; 130 passed.
+- A rerun of the M2 experiment and figures on the current 40 sites, with every number in
+  `docs/m2_imputation.md`, ADR-007 and LIMITATIONS updated.
+
+**What changed, and what was wrong**
+1. *Two M2 claims didn't survive the new site list.*
+   - "Peers are mixed" no longer holds: peers now win everywhere. ADR-007 now says so, and explains
+     why the default doesn't change.
+   - "Regression improves MAPE" no longer holds: MAPE is 16.1% vs the baseline's 16.0%. The
+     headline was reworded, because the billing-peak error is still about half.
+   Caught by regenerating every table instead of only the summary.
+2. *The hourly-vs-15-min comparison is a trade-off, not a win.* On the new list, 15-min slots
+   reduce bias but slightly widen the median absolute error. The doc now presents both sides. The
+   M2 entry above records the earlier numbers as history (original site list).

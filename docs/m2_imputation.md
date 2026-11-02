@@ -3,21 +3,17 @@
 **Question.** Utility interval data often has 1–3 month holes. If we fill them, how wrong are the
 filled months? And how wrong is the thing we actually bill on, each month's peak kW?
 
-**Answer (illustrative, ComStock modeled buildings).** A simple seasonal-profile fill
-understates billing peaks: in half the affected months it is off by 12% or more, and its average
-bias is −14%. The bias is worst in summer. A weather-aware regression halves the typical peak
-error (6%) and cuts the bias to about −4%. The tail is still fat: with the regression, 1 month
-in 10 is off by 27% or more. That spread is what M4 should carry as uncertainty for any site with imputed
-months.
+**Answer (illustrative, ComStock modeled buildings, current 40-site list).** A simple
+seasonal-profile fill understates billing peaks: in half the affected months it is off by 13% or
+more, and its average bias is −14%. The bias is worst in summer. A weather-aware regression roughly
+halves the typical peak error (7%) and cuts the bias to about −3%. The tail is still fat: with
+the regression, 1 month in 10 is off by 25% or more. That spread is what M4 should carry as
+uncertainty for any site with imputed months.
 
 ## Setup
 
-> **Site list note.** These results use the original 40 sites. In M3, 5 NSTAR sites were
-> replaced (DECISIONS.md ADR-010). Rerun `scripts/evaluate_imputation.py` and
-> `scripts/plot_imputation.py` to refresh.
-
-
-- **Data:** all 40 selected sites, one real ComStock year each (15-min, AMY2018).
+- **Data:** all 40 sites in `data/sites.csv` (after the M3 NSTAR replacement, ADR-010), one real
+  ComStock year each (15-min, AMY2018).
 - **Gaps:** 6 per site, seeded (`gaps.seed = 7`). Lengths are 30–92 days (mean 62), and they start at a
   random 15-min interval. That makes 240 gaps, and 497 billing months that are at least 50% inside a gap.
 - **Scoring:** the true data is hidden, each method fills it, and we compare against the truth.
@@ -41,24 +37,24 @@ All 240 gaps. Peak metrics use months at least 50% inside a gap. Signed error = 
 
 | Method | MAE (kW, median) | MAPE (%, median) | Peak abs error (%, median) | Peak abs error (%, P90) | Peak bias (%, mean) |
 |---|---|---|---|---|---|
-| seasonal_profile | 11.1 | 16.5 | 11.9 | 40.8 | −14.0 |
-| regression_weather | 8.9 | 15.7 | 6.0 | 26.6 | −4.4 |
-| regression_weather_peers | 8.2 | 14.4 | 6.4 | 23.5 | −1.7 |
+| seasonal_profile | 9.4 | 16.0 | 13.3 | 39.0 | −14.3 |
+| regression_weather | 8.3 | 16.1 | 7.3 | 25.2 | −3.4 |
+| regression_weather_peers | 7.2 | 13.9 | 5.3 | 22.7 | −1.1 |
 
 ![Billing-peak error by method](m2/monthly_peak_error.png)
 
-**Interval accuracy barely moves; peak accuracy moves a lot.** MAPE improves only from 16.5% to
-14.4%, but the baseline's peak error is twice the regression's. A method chosen by MAE alone
-would look nearly as good as the others and still be wrong where the money is.
+**MAPE cannot tell the methods apart; the billing peak can.** The regression's MAPE (16.1%) is
+no better than the baseline's (16.0%), yet its billing-peak error is about half. A method
+chosen by MAPE alone would look as good as the others and still be wrong where the money is.
 
 **The baseline underestimates peaks, and summer is where it hurts.**
 
 | Months | Baseline | Regression | Regression + peers |
 |---|---|---|---|
-| Summer (Jun–Sep), abs error % median | 20.7 | 6.5 | 5.2 |
-| Summer, mean bias % | −20.1 | −5.3 | −1.6 |
-| Other months, abs error % median | 8.6 | 5.6 | 6.6 |
-| Other months, mean bias % | −9.7 | −3.8 | −1.8 |
+| Summer (Jun–Sep), abs error % median | 18.8 | 8.1 | 4.5 |
+| Summer, mean bias % | −19.4 | −4.0 | −0.5 |
+| Other months, abs error % median | 10.0 | 6.5 | 5.6 |
+| Other months, mean bias % | −10.8 | −2.9 | −1.5 |
 
 A summer gap gets filled with May and September days, so cooling peaks vanish (see the example
 below). Peak shaving is worth the most in exactly those months.
@@ -69,42 +65,45 @@ below). Peak shaving is worth the most in exactly those months.
 
 | Type | Baseline | Regression | + peers |
 |---|---|---|---|
-| Warehouse | 3.3 | 2.2 | 2.7 |
-| FullServiceRestaurant | 9.5 | 3.3 | 3.7 |
-| MediumOffice | 8.2 | 4.4 | 5.2 |
-| Outpatient | 12.3 | 4.5 | 6.7 |
-| RetailStandalone | 15.4 | 7.9 | 9.1 |
-| SecondarySchool | 23.5 | 11.4 | 9.8 |
-| PrimarySchool | 20.2 | 12.9 | 10.1 |
-| RetailStripmall | 18.1 | 13.1 | 12.1 |
+| Warehouse | 4.4 | 3.8 | 2.7 |
+| FullServiceRestaurant | 10.7 | 4.7 | 2.5 |
+| Outpatient | 15.0 | 5.7 | 5.5 |
+| MediumOffice | 9.3 | 6.5 | 3.4 |
+| RetailStandalone | 13.5 | 8.3 | 6.7 |
+| SecondarySchool | 23.5 | 11.1 | 7.6 |
+| RetailStripmall | 15.4 | 14.0 | 11.0 |
+| PrimarySchool | 24.3 | 14.8 | 7.8 |
 
-Schools are hardest: summer break and the academic calendar are not in the features. Peers
-help there, because the peer schools share the calendar.
+Schools are hardest: summer break and the academic calendar are not in the features. Peers help
+most there, because the peer schools share the calendar.
 
 ## What this means for demand charges
 
 - The error flows straight into the bill. A demand charge is `rate × monthly peak kW`, so a −14%
   peak bias means the baseline understates that month's demand charge by about 14%. It also
-  understates the battery's shaving opportunity in that month. The median absolute miss is 18 kW
-  (baseline) against 11 kW (regression), next to a 125 kW battery.
-- **Dollars come in M3.** Converting kW to $ needs the real tariff files. We don't invent a $/kW
-  rate (principle 2). M3 will re-run this table in $/month per site.
+  understates the battery's shaving opportunity in that month. The median absolute miss is 18.5 kW
+  (baseline) against 11.9 kW (regression), next to a 125 kW battery.
+- **In dollars:** at MECo G-2's $14.82/kW (`data/tariffs/meco_g2_sema.json`), the median miss is about
+  $274 per affected month for the baseline and $176 for the regression.
 - **Uncertainty to carry forward:** the signed peak error of `regression_weather` has P10/P90 of
-  −23.5% / +8.4% per affected month. M4 should sample from this empirical distribution for
-  imputed months. It should not treat filled data as known.
+  −20.6% / +11.7% per affected month. Any site with imputed months should carry this into M4
+  rather than treat filled data as known. The current 40 sites have no real gaps.
 
 ## Choice and caveats
 
-- **Default imputer: `regression_weather`.** The peer variant has lower bias and a better P90, but a
-  slightly worse median outside summer. Its advantage is also probably *inflated* here: ComStock
-  buildings of one type share prototype schedules, so peers move together far more tightly than
-  real neighbors do (LIMITATIONS.md). The peer variant stays available, and we can revisit it on
-  real meter data.
-- **Resolution matters.** The first version used *hourly* time dummies. Switching to 15-min slots,
-  which matches the data, improved peak bias from −6.1% to −4.4% for the plain regression (and from
-  −2.8% to −1.7% with peers), and lowered MAE. The median absolute peak error with peers went
-  slightly up (5.6% to 6.4%). Both runs are reported, nothing was tuned further, and the
-  change was made because the resolution should match the data, not to chase this test set.
+- **Default imputer: `regression_weather`.** On this site list the peer variant beats it on every
+  breakdown above, by type, by season and on bias. We still don't make it the default, because its
+  advantage is probably *inflated*: ComStock buildings of one type share prototype schedules, so
+  peers move together far more tightly than real neighbors (LIMITATIONS.md). The peer variant
+  stays available, and we can revisit it on real meter data.
+- **Resolution is a trade-off, not a free win.** On these 40 sites we compared hourly against
+  15-min time dummies:
+  - 15-min slots, which match the data, cut the peak bias from −5.4% to −3.4% (regression) and from
+    −2.5% to −1.1% (peers), and lower MAE and MAPE.
+  - They slightly widen the spread: median abs peak error 7.1% → 7.3% (regression) and 4.3% →
+    5.3% (peers).
+  - We keep 15-min slots because a systematic understatement of demand charges is the costlier
+    error for ranking. Hourly numbers come from a scratch rerun, not committed code.
 - **Clean gaps only.** Gaps here are whole-meter outages in otherwise clean modeled data. Real
   outages may cluster (storms), come with partial data, or affect peers at the same time.
 - **Calendar months** stand in for billing cycles.

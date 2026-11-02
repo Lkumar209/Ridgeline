@@ -25,7 +25,7 @@ list grows each milestone.
 - **The peer method looks better than it would in reality.** Same-type ComStock buildings share
   prototype schedules, so peers track each other unrealistically well. It is not the default for
   this reason (ADR-007).
-- **Schools and strip malls are the hardest** (about 10–13% median peak error even for the regression),
+- **Schools and strip malls are the hardest** (about 11–15% median peak error even for the regression),
   because academic calendars and tenant mixes are not features.
 - **Calendar months stand in for billing cycles.**
 

@@ -114,15 +114,18 @@ default. Methods are scored on monthly peak error and bias, with MAE/MAPE second
 (`docs/m2_imputation.md`).
 
 **Why not peers by default.** On ComStock, same-type buildings share prototype schedules, so the
-peer signal is unrealistically clean. Even so, its median peak error was mixed: better in summer,
-worse otherwise.
+peer signal is unrealistically clean. *(Updated in M4: on the original site list, the peer
+variant's median peak error was mixed. On the current 40 sites it wins on every breakdown, which
+fits the "inflated by shared prototypes" explanation, so the default stays until it can be tested on
+real meters.)*
 
 **Rejected.** Gradient boosting or other ML libraries: a new dependency, harder to explain, and
-the linear model already removes most of the bias. Hourly dummies: they flatten intra-hour peaks
-(measured, see the M2 doc). Hinge temperatures and ridge λ live in `config/default.yaml` as
+the linear model already removes most of the bias. Hourly dummies: they increase the peak bias
+(−5.4% vs −3.4% for the regression on the current sites), though their median absolute error is
+slightly lower. That trade-off is measured in the M2 doc. Hinge temperatures and ridge λ live in `config/default.yaml` as
 modeling choices, not facts.
 
-**Consequence.** Imputed months still carry about ±25% peak error in the tails. M4 must sample that
+**Consequence.** Imputed months still carry roughly −21% / +12% peak error at P10/P90. M4 must sample that
 error rather than treat filled data as known.
 
 ## ADR-008: Battery dispatch and billing (M3)
