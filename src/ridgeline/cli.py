@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections import Counter
 from pathlib import Path
 
 import httpx
+import pandas as pd
 import typer
 
 from ridgeline.assumptions import load_assumptions
@@ -24,6 +26,9 @@ from ridgeline.data.tariffs import (
     tariff_coverage,
     with_proxies,
 )
+from ridgeline.ranking.pipeline import rank_sites, site_economics
+from ridgeline.results import cached_savings
+from ridgeline.scenarios.inputs import EconomicInputs
 
 app = typer.Typer(help="Ridgeline: rank sites for battery peak shaving (illustrative).")
 
@@ -177,9 +182,67 @@ def _tariffs_for(settings: Settings, sites: list[Site], override: Path | None) -
 
 
 @app.command()
-def rank() -> None:
-    """Run the Monte Carlo and rank sites (M4)."""
-    _not_yet("M4")
+def rank(
+    dev_subset: bool = typer.Option(False, "--dev-subset", help="Only the 10 dev sites."),
+    draws: int | None = typer.Option(None, help="Monte Carlo draws (default from config)."),
+    resimulate: bool = typer.Option(False, help="Ignore cached savings and re-simulate."),
+    config: Path | None = typer.Option(None, help="Config file (default: config/default.yaml)."),
+) -> None:
+    """15-year Monte Carlo and robustness ranking, with sensitivity (illustrative)."""
+    settings = load_settings(config)
+    sites = read_sites(settings.resolve(settings.paths.sites_file))
+    sites = [s for s in sites if s.dev_subset] if dev_subset else sites
+    assumptions = load_assumptions()
+    spec = BatterySpec.from_assumptions(assumptions)
+
+    def simulate_savings() -> pd.DataFrame:
+        all_sites = read_sites(settings.resolve(settings.paths.sites_file))
+        tariffs = _tariffs_for(settings, all_sites, None)
+        loads = _cached_loads(settings, all_sites)
+        typer.echo(f"simulating {len(all_sites)} sites (cached for later runs)...")
+        return simulate_sites(all_sites, loads, tariffs, spec, with_optimal=False)[1]
+
+    savings, was_cached = cached_savings(settings, simulate_savings, force=resimulate)
+    typer.echo(f"savings: {'cache hit' if was_cached else 'simulated'}")
+    economics = site_economics(sites, savings, assumptions)
+    inputs = EconomicInputs.from_assumptions(assumptions, spec.power_kw)
+    n_draws = draws or settings.scenarios.n_draws
+    started = time.perf_counter()
+    result = rank_sites(economics, inputs, n_draws, settings.scenarios.seed)
+    elapsed = time.perf_counter() - started
+
+    out_dir = settings.resolve(settings.paths.cache_dir) / "results"
+    result.ranking.to_csv(out_dir / "ranking.csv", index=False)
+    result.tornado.to_csv(out_dir / "tornado.csv", index=False)
+    pd.DataFrame([vars(s) for s in result.shifts]).to_csv(out_dir / "rank_shifts.csv", index=False)
+    columns = [
+        "rank",
+        "site_id",
+        "building_type",
+        "tariff_is_proxy",
+        "npv_p10",
+        "npv_p50",
+        "npv_p90",
+        "p_npv_positive",
+        "rank_by_p50",
+        "breakeven_capex_usd_per_kw",
+    ]
+    typer.echo(result.ranking[columns].round(0).to_string(index=False))
+    for key, sentence in result.explanations.items():
+        typer.echo(f"\n[{key}] {sentence}")
+    typer.echo(
+        f"\n{len(sites)} sites x {n_draws} draws x {inputs.life_years} years in {elapsed:.1f}s; "
+        f"wrote ranking.csv, tornado.csv, rank_shifts.csv to {out_dir} (illustrative)"
+    )
+
+
+def _cached_loads(settings: Settings, sites: list[Site]) -> dict[str, pd.Series]:
+    cache = settings.resolve(settings.paths.cache_dir) / "comstock" / "timeseries"
+    missing = [s.site_id for s in sites if not (cache / f"{s.bldg_id}.parquet").exists()]
+    if missing:
+        typer.echo(f"no cached load for {missing}; run `ridgeline fetch-data` first", err=True)
+        raise typer.Exit(code=1)
+    return {s.site_id: load_cached_timeseries(cache / f"{s.bldg_id}.parquet") for s in sites}
 
 
 @app.command()
