@@ -92,3 +92,39 @@ it was caught. Newest milestone at the bottom.
 5. *Precomputing the design matrix was expected to fix a 65 s runtime.* Profiling showed the time is
    spread evenly (one-hot build, fits, peak bookkeeping), so the runtime is accepted and stated as the
    M2 budget instead of adding complexity.
+
+## M3: battery dispatch and billing
+
+**Key prompts**
+- Threshold controller, a tariff bill calculator, a perfect-foresight bound, and property tests (SoC,
+  conservation, peak never raised, bill with battery ≤ without), developed on the dev subset.
+- Tariffs: invent none. Report coverage under MECo G-2 (≤ 200 kW); handle $/kVA via an assumed PF;
+  fail loudly on 0 or 2+ matches; propose options for unmatched sites and wait for a decision.
+- Mid-milestone: the user sent a message saying "here is the URDB JSON", but **no JSON was
+  attached**. It was not fabricated from the summary. The eligibility logic (kW and kWh limits) was
+  built and tested, and the file remains to be committed.
+
+**What was generated**
+- `battery/` (model, dispatch, billing, optimal LP, simulate), `ridgeline simulate`, kVA
+  conversion, strict tariff matching, usage-limit eligibility, `docs/m3_dispatch.md`, and 29 new tests.
+
+**What was wrong or rejected, and how it was caught**
+1. *LP post-processing produced net load = −1.6e-15 kW.* I had "cleaned" the LP output by cancelling
+   simultaneous charge and discharge; floating-point cancellation (17 − 16.99) left a tiny negative
+   net, which billing rejected as export. Caught by the hypothesis property test (it shrank the case
+   to a 4-interval load). **My first diagnosis was wrong**: I blamed solver tolerance and wrote that
+   in a comment. The regression test passed even without the fix, which exposed the mistake. I then
+   showed the test fails on the original post-processing and passes on the fix (clip discharge to
+   load + charge, and drop the cancellation step), and corrected the comment.
+2. *That cancellation step could also push stored energy above `soc_max`.* Found while reasoning
+   about the bug above. Removed: simultaneous charge and discharge in the LP is cost-neutral, so it
+   is left as solved, and the "no simultaneous" property is asserted only for the threshold rule.
+3. *Wrong expectation in a unit test:* I expected a 50 kW recharge after a 30 kW shave. The
+   controller correctly recharges only 30 / 0.88 = 34.1 kW (the battery is full again). The test
+   was fixed, not the code.
+4. *Lazy lambdas in the simulate loop* (ruff B023). They were safe but needlessly subtle, so I replaced
+   them with direct calls.
+5. *Considered reporting capture ratios from the full fake fixture.* That would conflate demand
+   savings with energy arbitrage the threshold rule never attempts. Added a flat-demand-only run,
+   which showed the rule matches the LP's peak cut when given the right threshold. The capture gap is a
+   forecasting problem.

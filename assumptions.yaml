@@ -43,6 +43,35 @@ power_factor_for_kva_demand:
     Used only to convert $/kVA demand charges to $/kW (rate / PF). ComStock gives real power
     only, so a site's actual power factor is unknown. Placeholder for typical commercial loads.
 
+billing_demand_basis:
+  value: highest 15-min average kW in the billing month
+  unit: definition
+  source: ASSUMPTION
+  notes: >-
+    Simplification. Per the project owner's reading of the MECo G-2 tariff, billing demand has a
+    kVA-based clause above 75 kW. ComStock gives real power only, so we bill on kW. Where a URDB
+    record states demand in kVA, the loader converts $/kVA with power_factor_for_kva_demand instead.
+
+bill_scope_delivery_only:
+  value: delivery charges only; supply (basic service) energy excluded
+  unit: scope
+  source: ASSUMPTION
+  notes: >-
+    The MECo G-2 URDB record covers delivery service only (per the project owner). Supply costs
+    are excluded from bills, so battery round-trip losses and any energy arbitrage are
+    under-valued. Demand-charge savings, the main value stream here, are unaffected.
+
+meco_g2_urdb_record:
+  value: 67d08dea7568c8189f03c54e (approved = false in URDB)
+  unit: URDB rate id
+  source: https://apps.openei.org/USURDB/rate/view/67d08dea7568c8189f03c54e
+  notes: >-
+    Massachusetts Electric Co (EIA 11804) G-2 Demand, SEMA load zone, effective 2025-02-01.
+    The project owner reports $14.82/kW flat monthly demand, max 200 kW, min 10,000 kWh/month,
+    source document meco_g2.pdf from National Grid. The record is marked approved = false in
+    URDB. URL built from the rate id; the JSON is not yet committed, so all of this is unverified
+    until data/tariffs/meco_g2_sema.json is added and parsed.
+
 comstock_load_data:
   value: ComStock 2024 release 2, AMY2018, upgrade 0 (baseline)
   unit: dataset

@@ -19,7 +19,7 @@ flagged. So the bill with a battery is never above the bill without one, by cons
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 
 import numpy as np
 import pandas as pd
@@ -27,7 +27,7 @@ import pandas as pd
 from ridgeline.battery.billing import interval_prices, month_bill
 from ridgeline.battery.dispatch import Dispatch, feasible_threshold, threshold_dispatch
 from ridgeline.battery.optimal import optimal_dispatch
-from ridgeline.data.schemas import BatterySpec, Tariff
+from ridgeline.data.schemas import BatterySpec, Site, Tariff
 
 STRATEGIES = ("base", "practical", "oracle", "optimal")
 COST_TOL_USD = 1e-6
@@ -103,3 +103,34 @@ def annual_summary(monthly: pd.DataFrame) -> dict[str, float]:
     if optimal is not None:
         out["capture_ratio"] = out["practical_savings_usd"] / optimal if optimal > 0 else np.nan
     return out
+
+
+def simulate_sites(
+    sites: list[Site],
+    loads: Mapping[str, pd.Series],
+    tariffs: Mapping[str, Tariff],
+    spec: BatterySpec,
+    *,
+    with_optimal: bool = True,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Run `simulate_site` for each site. Returns (monthly rows, one summary row per site).
+
+    `tariffs` maps site_id to the tariff already matched to it; matching (and failing loudly
+    on zero or several matches) is the caller's job, see `data/tariffs.match_tariff`.
+    """
+    monthly_frames, summaries = [], []
+    for site in sites:
+        tariff = tariffs[site.site_id]
+        monthly = simulate_site(loads[site.site_id], tariff, spec, with_optimal=with_optimal)
+        tags = {"site_id": site.site_id, "tariff_id": tariff.tariff_id}
+        monthly_frames.append(monthly.reset_index().assign(**tags))
+        summaries.append(
+            {
+                **tags,
+                "building_type": site.building_type,
+                "peak_kw": site.peak_kw,
+                "tariff_is_test_fixture": tariff.is_test_fixture,
+                **annual_summary(monthly),
+            }
+        )
+    return pd.concat(monthly_frames, ignore_index=True), pd.DataFrame(summaries)

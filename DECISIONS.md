@@ -124,3 +124,49 @@ modeling choices, not facts.
 
 **Consequence.** Imputed months still carry about ±25% peak error in the tails. M4 must sample that
 error rather than treat filled data as known.
+
+## ADR-008: Battery dispatch and billing (M3)
+
+**Decision.**
+- **Billing:** each local calendar month is billed and simulated independently, with the
+  battery starting full.
+- **Practical controller:** a threshold rule with a ratchet. Its starting threshold is the lowest
+  threshold it could have held over the *previous* month (persistence: history only). January
+  uses December of the same data year because we have one weather year.
+- **Upper bound:** a perfect-foresight LP per month (scipy HiGHS, sparse) defines the capture ratio.
+- **Diagnostic:** an "oracle threshold" run isolates the threshold forecast from the rule itself.
+- **Idle guard:** a month whose dispatch costs more than no battery is billed idle and flagged,
+  because an operator can always leave it off. So bill(with) ≤ bill(without) holds by construction.
+
+**Why.**
+- The threshold rule is what a simple commercial controller does, and it is explainable in one sentence.
+- Independent months keep billing modular and make the LP small: about 3,000 intervals and about 9,000 variables.
+- With a perfect threshold the rule matches the LP's peak reduction (`docs/m3_dispatch.md`), so the
+  rule is sound and the open problem is forecasting. That is where future work should go.
+
+**Rejected.**
+- **cvxpy:** heavier dependency; the LP is small and scipy's HiGHS solves it directly.
+- **MILP to forbid simultaneous charge and discharge:** cost-neutral cases don't change the bill, and
+  MILP is much slower.
+- **Carrying SoC across months:** a marginal effect, and it couples months, making billing and tests harder.
+
+## ADR-009: Tariff eligibility, kVA demand and coverage (M3)
+
+**Decision.**
+- **Eligibility:** a site matches a tariff when the utility EIA ID matches, its annual 15-min peak
+  is inside the kW limits, and its *average* monthly kWh is inside the usage limits. Exactly one
+  match is required; zero or several raise `TariffMatchError`, and `simulate` exits listing every
+  failing site.
+- **$/kVA demand charges** are converted to $/kW as rate / PF with
+  `power_factor_for_kva_demand` (ASSUMPTION, 0.90), and the tariff records the PF used.
+- **MECo G-2's kVA clause above 75 kW** is simplified to the 15-min kW peak (`billing_demand_basis`, ASSUMPTION).
+
+**Open.** Average-month vs every-month usage eligibility (the stricter reading drops one site). Coverage is
+13 of 40 sites under G-2 alone. Options and a recommendation are in `docs/m3_dispatch.md`; the
+site list is unchanged pending the project owner's decision.
+
+**Rejected.** Picking the "closest" tariff when none matches, which hides a data gap. Silently ignoring kVA
+units, which gives a wrong $/kW by a factor of 1/PF.
+
+**Dependency.** scipy (runtime) for the LP; scipy-stubs (dev) for typing. A one-line type ignore
+covers the stubs not declaring sparse-matrix support in `linprog`.
