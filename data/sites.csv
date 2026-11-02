@@ -1,16 +1,16 @@
 site_id,bldg_id,building_type,county_gisjoin,county_name,tract_gisjoin,utility_eiaid,sqft,peak_kw,mean_kw,par_tier,dev_subset,data_source
 cs-68361,68361,MediumOffice,G2500170,"MA, Middlesex County",G2500170368300,11804,90000.000,275.094,125.286,low,True,comstock
-cs-38821,38821,RetailStripmall,G2500270,"MA, Worcester County",G2500270761300,54913,21000.000,148.347,40.316,mid,True,comstock
+cs-9978,9978,RetailStripmall,G2500170,"MA, Middlesex County",G2500170370300,11804,21000.000,132.882,35.934,mid,True,comstock
 cs-16342,16342,RetailStandalone,G2500170,"MA, Middlesex County",G2500170382100,11804,10000.000,175.625,27.039,high,True,comstock
 cs-45533,45533,PrimarySchool,G2500170,"MA, Middlesex County",G2500170365100,11804,21000.000,137.740,29.163,low,True,comstock
 cs-144167,144167,SecondarySchool,G2500270,"MA, Worcester County",G2500270742300,11804,125000.000,566.091,107.728,mid,True,comstock
 cs-130562,130562,Outpatient,G2500170,"MA, Middlesex County",G2500170365202,11804,10000.000,134.085,31.845,high,True,comstock
 cs-31197,31197,Warehouse,G2500170,"MA, Middlesex County",G2500170316500,11804,125000.000,185.236,88.367,low,True,comstock
-cs-42670,42670,FullServiceRestaurant,G2500170,"MA, Middlesex County",G2500170333600,54913,5500.000,162.163,63.832,mid,True,comstock
+cs-65325,65325,FullServiceRestaurant,G2500170,"MA, Middlesex County",G2500170350900,11804,10000.000,135.636,39.610,mid,True,comstock
 cs-32304,32304,MediumOffice,G2500170,"MA, Middlesex County",G2500170315100,11804,67000.000,205.182,62.726,mid,True,comstock
 cs-30878,30878,RetailStripmall,G2500270,"MA, Worcester County",G2500270728200,11804,10000.000,203.752,29.180,high,True,comstock
 cs-17213,17213,RetailStandalone,G2500170,"MA, Middlesex County",G2500170382500,11804,90000.000,332.829,122.703,low,False,comstock
-cs-65258,65258,PrimarySchool,G2500170,"MA, Middlesex County",G2500170382100,54913,58000.000,360.139,73.685,mid,False,comstock
+cs-45394,45394,PrimarySchool,G2500130,"MA, Hampden County",G2500130811302,11804,35000.000,191.694,36.987,mid,False,comstock
 cs-18182,18182,SecondarySchool,G2500170,"MA, Middlesex County",G2500170342202,11804,46000.000,285.275,44.479,high,False,comstock
 cs-108896,108896,Outpatient,G2500130,"MA, Hampden County",G2500130812103,11804,125000.000,644.623,254.933,low,False,comstock
 cs-53639,53639,Warehouse,G2500130,"MA, Hampden County",G2500130811500,11804,300000.000,354.619,127.406,mid,False,comstock
@@ -27,7 +27,7 @@ cs-68363,68363,MediumOffice,G2500270,"MA, Worcester County",G2500270731700,11804
 cs-118913,118913,RetailStripmall,G2500250,"MA, Suffolk County",G2500250010701,11804,21000.000,461.245,92.613,high,False,comstock
 cs-67706,67706,RetailStandalone,G2500130,"MA, Hampden County",G2500130810901,11804,58000.000,585.843,69.634,high,False,comstock
 cs-70654,70654,PrimarySchool,G2500270,"MA, Worcester County",G2500270728300,11804,46000.000,178.250,42.045,low,False,comstock
-cs-104743,104743,SecondarySchool,G2500170,"MA, Middlesex County",G2500170373900,54913,175000.000,871.182,136.181,high,False,comstock
+cs-106921,106921,SecondarySchool,G2500270,"MA, Worcester County",G2500270743100,11804,175000.000,863.426,135.558,high,False,comstock
 cs-130568,130568,Outpatient,G2500250,"MA, Suffolk County",G2500250100400,11804,21000.000,230.497,59.261,high,False,comstock
 cs-83023,83023,Warehouse,G2500170,"MA, Middlesex County",G2500170383101,11804,90000.000,123.292,55.136,low,False,comstock
 cs-60587,60587,FullServiceRestaurant,G2500170,"MA, Middlesex County",G2500170316500,11804,21000.000,225.687,56.025,high,False,comstock
@@ -35,7 +35,7 @@ cs-90862,90862,MediumOffice,G2500170,"MA, Middlesex County",G2500170361300,11804
 cs-79825,79825,RetailStripmall,G2500130,"MA, Hampden County",G2500130812201,11804,90000.000,467.942,177.185,low,False,comstock
 cs-97381,97381,RetailStandalone,G2500170,"MA, Middlesex County",G2500170383600,11804,175000.000,549.722,251.776,low,False,comstock
 cs-36166,36166,PrimarySchool,G2500170,"MA, Middlesex County",G2500170315100,11804,35000.000,193.511,34.810,high,False,comstock
-cs-104750,104750,SecondarySchool,G2500130,"MA, Hampden County",G2500130811500,54913,175000.000,643.467,153.194,low,False,comstock
+cs-39283,39283,SecondarySchool,G2500170,"MA, Middlesex County",G2500170342500,11804,21000.000,168.705,43.207,low,False,comstock
 cs-108897,108897,Outpatient,G2500170,"MA, Middlesex County",G2500170314301,11804,67000.000,422.882,165.119,low,False,comstock
 cs-128761,128761,Warehouse,G2500130,"MA, Hampden County",G2500130810200,11804,175000.000,851.502,146.602,high,False,comstock
 cs-127977,127977,FullServiceRestaurant,G2500250,"MA, Suffolk County",G2500250070101,11804,21000.000,233.697,131.949,low,False,comstock

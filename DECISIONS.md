@@ -124,3 +124,91 @@ modeling choices, not facts.
 
 **Consequence.** Imputed months still carry about ±25% peak error in the tails. M4 must sample that
 error rather than treat filled data as known.
+
+## ADR-008: Battery dispatch and billing (M3)
+
+**Decision.**
+- **Billing:** each local calendar month is billed and simulated independently, with the
+  battery starting full.
+- **Practical controller:** a threshold rule with a ratchet. Its starting threshold is the lowest
+  threshold it could have held over the *previous* month (persistence: history only). The first
+  month of the data has no history, so the battery is idle that month. *(Amended: originally
+  January borrowed December of the same data year, which is a lookahead. It was removed at the
+  project owner's request; median capture on the original dev subset went from 0.565 to 0.544.)*
+- **Upper bound:** a perfect-foresight LP per month (scipy HiGHS, sparse) defines the capture ratio.
+- **Diagnostic:** an "oracle threshold" run isolates the threshold forecast from the rule itself.
+- **Idle guard:** a month whose dispatch costs more than no battery is billed idle and flagged,
+  because an operator can always leave it off. So bill(with) ≤ bill(without) holds by construction.
+
+**Why.**
+- The threshold rule is what a simple commercial controller does, and it is explainable in one sentence.
+- Independent months keep billing modular and make the LP small: about 3,000 intervals and about 9,000 variables.
+- With a perfect threshold the rule matches the LP's peak reduction (`docs/m3_dispatch.md`), so the
+  rule is sound and the open problem is forecasting. That is where future work should go.
+
+**Rejected.**
+- **cvxpy:** heavier dependency; the LP is small and scipy's HiGHS solves it directly.
+- **MILP to forbid simultaneous charge and discharge:** cost-neutral cases don't change the bill, and
+  MILP is much slower.
+- **Carrying SoC across months:** a marginal effect, and it couples months, making billing and tests harder.
+
+## ADR-009: Tariff eligibility, kVA demand and coverage (M3)
+
+**Decision.**
+- **Eligibility:** a site matches a tariff when the utility EIA ID matches, its annual 15-min peak
+  is inside the kW limits, and its *average* monthly kWh is inside the usage limits. Exactly one
+  match is required; zero or several raise `TariffMatchError`, and `simulate` exits listing every
+  failing site.
+- **$/kVA demand charges** are converted to $/kW as rate / PF with
+  `power_factor_for_kva_demand` (ASSUMPTION, 0.90), and the tariff records the PF used.
+- **MECo G-2's kVA clause above 75 kW** is simplified to the 15-min kW peak (`billing_demand_basis`, ASSUMPTION).
+
+**Open.** Average-month vs every-month usage eligibility (the stricter reading drops one site). Coverage is
+13 of 40 sites under G-2 alone. Options and a recommendation are in `docs/m3_dispatch.md`; the
+site list is unchanged pending the project owner's decision.
+
+**Rejected.** Picking the "closest" tariff when none matches, which hides a data gap. Silently ignoring kVA
+units, which gives a wrong $/kW by a factor of 1/PF.
+
+**Dependency.** scipy (runtime) for the LP; scipy-stubs (dev) for typing. A one-line type ignore
+covers the stubs not declaring sparse-matrix support in `linprog`.
+
+## ADR-010: Tariff coverage, a labeled G-2 proxy and the NSTAR replacement (M3)
+
+**Context.** The only usable real tariff is MECo G-2 (EIA 11804, ≤ 200 kW, average use
+> 10,000 kWh/month). It covered 13 of the original 40 sites. No usable NSTAR (EIA 54913) rate was
+found, and the MECo G-3 records found are 115 kV service.
+
+**Decision** (project owner, from the options in `docs/m3_dispatch.md`):
+1. **Usage eligibility uses the average month.** The tariff text says "average use will exceed
+   10,000 kWh/month".
+2. **Proxy for large 11804 sites.** Sites above 200 kW are billed on G-2's rates via
+   `tariff_proxies` in config. The proxy is labeled `g2_proxy_above_200kw` (ASSUMPTION), carries
+   the id `…+proxy>200kW` and is flagged `tariff_is_proxy` in every output. A test requires each
+   proxy to name an ASSUMPTION.
+3. **NSTAR sites replaced.** The 5 NSTAR sites are swapped for 11804 sites of the same building
+   type and PAR tier (`replace_utility_eiaids: [54913]`). This uses a separate seeded draw, so the
+   other 35 sites are unchanged; a test enforces that.
+   - cs-38821 → cs-9978 (RetailStripmall, mid)
+   - cs-42670 → cs-65325 (FullServiceRestaurant, mid)
+   - cs-65258 → cs-45394 (PrimarySchool, mid)
+   - cs-104743 → cs-106921 (SecondarySchool, high)
+   - cs-104750 → cs-39283 (SecondarySchool, low)
+4. **Keep looking for a real large-customer rate (G-3).** In M4, the demand charge is swept by
+   about ±30% so the ranking shows whether it survives a wrong proxy.
+
+**Coverage now.**
+
+| | Real G-2 | G-2 proxy (> 200 kW) |
+|---|---|---|
+| All 40 sites | 17 | 23 |
+| Dev subset (10) | 6 | 4 |
+
+**Rejected.**
+- **Re-selecting all 40 from 11804 only:** it would have reshuffled the 35 kept sites and the dev
+  subset for no reason.
+- **Proxying NSTAR with a MECo tariff:** a different utility, which stretches too far.
+- **Inventing a G-3 rate:** violates principle 2.
+
+**Consequence.** The M2 imputation results (`docs/m2_imputation.md`) were computed on the
+original site list. Rerunning `scripts/evaluate_imputation.py` refreshes them.

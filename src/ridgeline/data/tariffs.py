@@ -1,19 +1,26 @@
-"""Load tariffs from URDB-format JSON files in `data/tariffs/`.
+"""Load tariffs from URDB-format JSON files in `data/tariffs/` and match them to sites.
 
 Files hold OpenEI Utility Rate Database (API v8) records, either a single record or the API's
 `{"items": [...]}` envelope, so a live URDB client can be added later without changing the
 parser. Anything the bill calculator cannot represent faithfully (tiered rates, per-day fixed
-charges, non-kW demand units) is rejected with an error rather than silently simplified.
-Demand ratchets are the one documented exception: they are flagged and ignored (LIMITATIONS.md).
+charges, unknown demand units) is rejected with an error rather than silently simplified.
+
+Two documented exceptions:
+* demand ratchets are flagged and ignored (LIMITATIONS.md);
+* $/kVA demand charges are converted to $/kW with an assumed power factor taken from
+  `assumptions.yaml` (`power_factor_for_kva_demand`), and the tariff records the PF used.
 """
 
 from __future__ import annotations
 
 import json
+import math
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+from ridgeline.config import TariffProxy
 from ridgeline.data.schemas import Site, Tariff, TouSchedule
 
 
@@ -21,64 +28,164 @@ class UnsupportedTariffError(ValueError):
     """The tariff uses a structure Ridgeline does not model."""
 
 
-def load_tariff_dir(directory: Path) -> list[Tariff]:
+class TariffMatchError(ValueError):
+    """A site matched zero tariffs, or more than one."""
+
+
+def load_tariff_dir(directory: Path, power_factor: float | None = None) -> list[Tariff]:
     """Parse every `*.json` in `directory`, sorted by filename for stable ordering."""
     tariffs: list[Tariff] = []
     for path in sorted(directory.glob("*.json")):
-        tariffs.extend(load_tariff_file(path))
+        tariffs.extend(load_tariff_file(path, power_factor))
     return tariffs
 
 
-def load_tariff_file(path: Path) -> list[Tariff]:
+def load_tariff_file(path: Path, power_factor: float | None = None) -> list[Tariff]:
     with path.open() as f:
         payload = json.load(f)
     records = payload["items"] if isinstance(payload, dict) and "items" in payload else [payload]
-    return [parse_urdb_record(r, fallback_id=path.stem) for r in records]
+    return [parse_urdb_record(r, path.stem, power_factor) for r in records]
 
 
-def parse_urdb_record(record: dict[str, Any], fallback_id: str) -> Tariff:
-    """Convert one URDB v8 record into a `Tariff`."""
-    flat = _flat_demand(record)
+def parse_urdb_record(
+    record: dict[str, Any], fallback_id: str, power_factor: float | None = None
+) -> Tariff:
+    """Convert one URDB v8 record into a `Tariff`.
+
+    `power_factor` is required only if the record bills demand in kVA; without it such a
+    record is refused.
+    """
+    demand_unit = _demand_unit(record)
+    divisor = 1.0
+    if demand_unit == "kVA":
+        if power_factor is None:
+            raise UnsupportedTariffError("demand billed in kVA but no power factor was given")
+        divisor = power_factor
     return Tariff(
         tariff_id=str(record.get("label") or fallback_id),
         utility=str(record["utility"]),
         eiaid=int(record["eiaid"]) if record.get("eiaid") is not None else None,
         name=str(record["name"]),
-        source_url=_source_url(record),
+        source_urls=_source_urls(record),
         urdb_uri=record.get("uri"),
         effective_date=_epoch_to_date(record.get("startdate")),
         fixed_monthly_usd=_fixed_monthly(record),
         energy_usd_per_kwh=_schedule(record, "energy", required=True),
-        demand_tou_usd_per_kw=_schedule(record, "demand", required=False),
-        flat_demand_usd_per_kw_by_month=flat,
+        demand_tou_usd_per_kw=_schedule(record, "demand", required=False, divisor=divisor),
+        flat_demand_usd_per_kw_by_month=_flat_demand(record, divisor),
         min_peak_kw=record.get("peakkwcapacitymin"),
         max_peak_kw=record.get("peakkwcapacitymax"),
+        min_monthly_kwh=record.get("peakkwhusagemin"),
+        max_monthly_kwh=record.get("peakkwhusagemax"),
         ratchet_ignored=any(float(p) > 0 for p in record.get("demandratchetpercentage") or []),
+        demand_converted_from_kva_at_pf=power_factor if demand_unit == "kVA" else None,
         is_test_fixture=bool(record.get("ridgeline_test_fixture", False)),
     )
 
 
-def assign_tariff(site: Site, tariffs: list[Tariff]) -> Tariff | None:
-    """The tariff for a site's utility whose size limits include the site's peak.
+# --- proxies ----------------------------------------------------------------------------
 
-    Returns None when no tariff matches. Raises if more than one matches, because silently
-    picking one would hide a data problem.
+
+def with_proxies(tariffs: list[Tariff], proxies: list[TariffProxy]) -> list[Tariff]:
+    """`tariffs` plus one derived tariff per proxy rule (DECISIONS.md ADR-010).
+
+    The derived tariff reuses the base tariff's rates unchanged. Only its kW eligibility moves:
+    it starts just above the base tariff's cap and has no upper limit. The id and `proxy_of`
+    make every use of it visible in outputs.
     """
-    matches = [t for t in tariffs if t.eiaid == site.utility_eiaid and t.is_eligible(site.peak_kw)]
-    if len(matches) > 1:
-        ids = ", ".join(t.tariff_id for t in matches)
-        raise ValueError(f"site {site.site_id} matches several tariffs: {ids}")
-    return matches[0] if matches else None
+    by_id = {t.tariff_id: t for t in tariffs}
+    derived = []
+    for rule in proxies:
+        base = by_id.get(rule.base_tariff_id)
+        if base is None:
+            raise ValueError(f"proxy references unknown tariff {rule.base_tariff_id}")
+        if base.eiaid != rule.eiaid or base.max_peak_kw != rule.applies_above_kw:
+            raise ValueError(
+                f"proxy for {base.tariff_id} must match its EIA id and kW cap "
+                f"({base.eiaid}, {base.max_peak_kw})"
+            )
+        derived.append(
+            base.model_copy(
+                update={
+                    "tariff_id": f"{base.tariff_id}+proxy>{rule.applies_above_kw:g}kW",
+                    # Strictly above the cap, so a site exactly at the cap matches only the base.
+                    "min_peak_kw": math.nextafter(rule.applies_above_kw, math.inf),
+                    "max_peak_kw": None,
+                    "proxy_of": base.tariff_id,
+                    "proxy_assumption": rule.assumption_key,
+                }
+            )
+        )
+    return [*tariffs, *derived]
+
+
+# --- matching ---------------------------------------------------------------------------
+
+
+def eligible_tariffs(site: Site, tariffs: list[Tariff]) -> list[Tariff]:
+    """Tariffs for the site's utility whose limits include the site's pre-battery annual peak
+    and its average monthly usage (DECISIONS.md ADR-009)."""
+    return [
+        t
+        for t in tariffs
+        if t.eiaid == site.utility_eiaid and t.is_eligible(site.peak_kw, site.mean_monthly_kwh)
+    ]
+
+
+def match_tariff(site: Site, tariffs: list[Tariff]) -> Tariff:
+    """The single tariff for a site. Raises `TariffMatchError` on zero or several matches."""
+    matches = eligible_tariffs(site, tariffs)
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise TariffMatchError(
+            f"site {site.site_id} (EIA {site.utility_eiaid}, peak {site.peak_kw:.0f} kW, "
+            f"{site.mean_monthly_kwh:,.0f} kWh/month) matches no tariff"
+        )
+    ids = ", ".join(t.tariff_id for t in matches)
+    raise TariffMatchError(f"site {site.site_id} matches several tariffs: {ids}")
+
+
+@dataclass(frozen=True)
+class TariffCoverage:
+    matched: dict[str, str] = field(default_factory=dict)  # site_id -> tariff_id
+    unmatched: list[str] = field(default_factory=list)
+    ambiguous: dict[str, list[str]] = field(default_factory=dict)
+
+    @property
+    def complete(self) -> bool:
+        return not self.unmatched and not self.ambiguous
+
+
+def tariff_coverage(sites: list[Site], tariffs: list[Tariff]) -> TariffCoverage:
+    """Which sites match exactly one tariff, none, or several (for reporting, not billing)."""
+    coverage = TariffCoverage()
+    for site in sites:
+        matches = eligible_tariffs(site, tariffs)
+        if len(matches) == 1:
+            coverage.matched[site.site_id] = matches[0].tariff_id
+        elif not matches:
+            coverage.unmatched.append(site.site_id)
+        else:
+            coverage.ambiguous[site.site_id] = [t.tariff_id for t in matches]
+    return coverage
 
 
 # --- helpers ----------------------------------------------------------------------------
 
 
-def _source_url(record: dict[str, Any]) -> str:
+def _source_urls(record: dict[str, Any]) -> list[str]:
+    """Every URL in `source` (URDB often lists several, separated by blank lines), else `uri`.
+
+    Regression: a multi-URL `source` used to be passed whole to HttpUrl, which stripped the
+    whitespace and silently glued the URLs into one invalid link.
+    """
     for key in ("source", "uri"):
         value = record.get(key)
-        if isinstance(value, str) and value.startswith("http"):
-            return value
+        if isinstance(value, str):
+            urls = [token for token in value.split() if token.startswith("http")]
+            if urls:
+                return urls
     raise ValueError("tariff record needs a 'source' or 'uri' URL")
 
 
@@ -106,31 +213,42 @@ def _single_tier_rates(structure: list[list[dict[str, Any]]], what: str) -> list
     return rates
 
 
-def _schedule(record: dict[str, Any], prefix: str, *, required: bool) -> TouSchedule | None:
+def _demand_unit(record: dict[str, Any]) -> str:
+    """The single demand unit used by the record: "kW" or "kVA". Refuses anything else."""
+    units = set()
+    if record.get("demandratestructure"):
+        units.add(record.get("demandunits") or "kW")
+    if record.get("flatdemandstructure"):
+        units.add(record.get("flatdemandunit") or "kW")
+    unknown = units - {"kW", "kVA"}
+    if unknown:
+        raise UnsupportedTariffError(
+            f"demand unit {sorted(unknown)} not supported (need kW or kVA)"
+        )
+    if len(units) > 1:
+        raise UnsupportedTariffError("mixed kW and kVA demand charges are not supported")
+    return units.pop() if units else "kW"
+
+
+def _schedule(
+    record: dict[str, Any], prefix: str, *, required: bool, divisor: float = 1.0
+) -> TouSchedule | None:
     structure = record.get(f"{prefix}ratestructure")
     if not structure:
         if required:
             raise ValueError(f"tariff record has no {prefix}ratestructure")
         return None
-    if prefix == "demand":
-        _require_kw(record.get("demandunits"))
     return TouSchedule(
-        rates=_single_tier_rates(structure, prefix),
+        rates=[r / divisor for r in _single_tier_rates(structure, prefix)],
         weekday=record[f"{prefix}weekdayschedule"],
         weekend=record[f"{prefix}weekendschedule"],
     )
 
 
-def _flat_demand(record: dict[str, Any]) -> list[float] | None:
+def _flat_demand(record: dict[str, Any], divisor: float) -> list[float] | None:
     structure = record.get("flatdemandstructure")
     if not structure:
         return None
-    _require_kw(record.get("flatdemandunit"))
     rates = _single_tier_rates(structure, "flat demand")
     months: list[int] = record.get("flatdemandmonths") or [0] * 12
-    return [rates[p] for p in months]
-
-
-def _require_kw(unit: Any) -> None:
-    if unit not in (None, "kW"):
-        raise UnsupportedTariffError(f"demand unit {unit!r} not supported (need kW)")
+    return [rates[p] / divisor for p in months]

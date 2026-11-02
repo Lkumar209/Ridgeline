@@ -12,6 +12,11 @@ months.
 
 ## Setup
 
+> **Site list note.** These results use the original 40 sites. In M3, 5 NSTAR sites were
+> replaced (DECISIONS.md ADR-010). Rerun `scripts/evaluate_imputation.py` and
+> `scripts/plot_imputation.py` to refresh.
+
+
 - **Data:** all 40 selected sites, one real ComStock year each (15-min, AMY2018).
 - **Gaps:** 6 per site, seeded (`gaps.seed = 7`). Lengths are 30–92 days (mean 62), and they start at a
   random 15-min interval. That makes 240 gaps, and 497 billing months that are at least 50% inside a gap.

@@ -38,6 +38,39 @@ list grows each milestone.
 - **Supply vs. delivery.** Results depend on which charges the committed tariff files include.
   Each file's source URL is the reference.
 
+## Battery and dispatch (M3)
+- **Months are independent** and the battery starts each month full. State of charge is not
+  carried across month boundaries.
+- **No degradation within a year.** Capacity fade enters in M4 as a per-year derate.
+- **The practical controller only defends one threshold** (the all-hours monthly peak). It ignores
+  energy prices and TOU-demand windows, so under TOU tariffs it leaves arbitrage and window-specific
+  savings to the LP bound.
+- **The persistence forecast is crude.** Each month starts at the threshold that would have held
+  last month. Median capture versus perfect foresight is 51% on the dev subset under G-2.
+- **The first month is idle.** With a single data year there is no history before January, so the
+  practical battery does nothing that month. That is causal but slightly pessimistic; a real site
+  would have last year's data. The earlier December wraparound was a lookahead and is now only an
+  opt-in comparison (`--wraparound-lookahead`).
+- **Idle months.** If dispatch would cost more than no battery in a month, that month is billed
+  as idle. This assumes the operator can tell, which slightly flatters the controller.
+- **No export, and no wholesale or demand-response revenue.**
+
+## MECo G-2 tariff (`data/tariffs/meco_g2_sema.json`)
+- **Delivery service only.** The record's `servicetype` is Delivery. Supply (basic service) energy
+  costs are excluded, so round-trip losses and energy arbitrage are under-valued
+  (`bill_scope_delivery_only`). Demand-charge savings are unaffected.
+- **Unapproved record.** The URDB record is marked `approved: false`. Its sources are National
+  Grid's `meco_delivery.pdf`, `meco_basic_service.pdf` and `meco_g2.pdf`.
+- **Billing demand simplified to the 15-min kW peak.** The tariff also has a clause of 90% of the
+  kVA peak above 75 kW, and a 5 kW floor. At our assumed power factor of 0.90, the kVA clause gives
+  the same number (`billing_demand_basis`).
+- **Load zone.** The record is labeled for the SEMA load zone. That should not change delivery
+  charges, but it would matter if supply were included.
+- **Eligibility.** The tariff applies up to 200 kW, with average use above 10,000 kWh/month.
+  - EIA 11804 sites above 200 kW are billed on G-2 values as a labeled proxy (ADR-010). Their
+    savings are indicative only; a real large-customer rate (G-3) is time-of-use.
+  - M4 sweeps the demand charge by about ±30% to test whether rankings survive a wrong proxy.
+
 ## Not modeled (by design, per the brief)
 - Wholesale market, capacity or demand-response revenue.
 - Interconnection costs and timelines.
