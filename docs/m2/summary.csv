@@ -1,0 +1,4 @@
+method,mae_kw_median,mape_pct_median,peak_abs_err_pct_median,peak_abs_err_pct_p90,peak_bias_pct_mean,months
+seasonal_profile,11.059,16.526,11.860,40.769,-13.994,497
+regression_weather,8.883,15.747,5.956,26.572,-4.444,497
+regression_weather_peers,8.151,14.399,6.353,23.534,-1.679,497

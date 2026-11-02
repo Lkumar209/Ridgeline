@@ -1,0 +1,44 @@
+# Every number that describes the world lives here, never inline in code.
+# Each entry needs: value, unit, source (a URL, or the literal "ASSUMPTION"), notes.
+# A test (tests/unit/test_assumptions.py) fails if any entry is missing a source or label.
+#
+# All outputs of this project are ILLUSTRATIVE. Values labeled ASSUMPTION are placeholders
+# chosen for plausibility, not facts.
+
+battery_power_kw:
+  value: 125
+  unit: kW
+  source: ASSUMPTION
+  notes: Default size from the project brief. Configurable per run.
+
+battery_energy_kwh:
+  value: 250
+  unit: kWh
+  source: ASSUMPTION
+  notes: Default size from the project brief (2-hour duration). Configurable per run.
+
+battery_round_trip_efficiency:
+  value: 0.88
+  unit: fraction (AC-AC)
+  source: ASSUMPTION
+  notes: Placeholder typical of lithium-ion commercial systems; varied in M4 Monte Carlo.
+
+battery_soc_min:
+  value: 0.05
+  unit: fraction of energy capacity
+  source: ASSUMPTION
+  notes: Reserve to avoid deep discharge. Placeholder.
+
+battery_soc_max:
+  value: 0.95
+  unit: fraction of energy capacity
+  source: ASSUMPTION
+  notes: Headroom at the top of charge. Placeholder.
+
+comstock_load_data:
+  value: ComStock 2024 release 2, AMY2018, upgrade 0 (baseline)
+  unit: dataset
+  source: https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/data_dictionary.tsv
+  notes: >-
+    Modeled (EnergyPlus) buildings, not metered sites. Timestamps are local standard time
+    (UTC-5) and interval-ending; verified empirically in M1 (see DECISIONS.md ADR-003).

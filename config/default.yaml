@@ -1,0 +1,51 @@
+# Ridgeline default configuration. Numbers that describe the world (costs, rates, efficiencies)
+# live in assumptions.yaml with a source; this file holds run settings only.
+
+paths:
+  cache_dir: data/cache
+  tariffs_dir: data/tariffs
+  sites_file: data/sites.csv
+
+comstock:
+  base_url: "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/"
+  upgrade: 0
+  state: MA
+  # NHGIS GISJOIN codes: Middlesex, Worcester, Suffolk, Hampden (east, central, Boston, west).
+  # See DECISIONS.md ADR-004 for why these four.
+  counties: [G2500170, G2500270, G2500250, G2500130]
+
+site_selection:
+  seed: 20261102
+  n_per_type: 5
+  building_types:
+    - MediumOffice
+    - RetailStripmall
+    - RetailStandalone
+    - PrimarySchool
+    - SecondarySchool
+    - Outpatient
+    - Warehouse
+    - FullServiceRestaurant
+  peak_kw_min: 100
+  peak_kw_max: 1000
+  # Per type, how many sites to draw from each peak-to-average-ratio tercile.
+  # Low PAR = flat load = weak peak-shaving candidate; included on purpose for ranking spread.
+  par_tier_quota: {low: 2, mid: 1, high: 2}
+  dev_subset_size: 10
+  # The two utilities serving ~75% of screened candidates. Restricting to them means two
+  # utilities' tariffs cover every site. IDs are EIA utility numbers from ComStock metadata.
+  utility_eiaids: [11804, 54913]
+
+gaps:
+  # Simulated meter outages (M2). Lengths are drawn uniformly in days.
+  seed: 7
+  gaps_per_site: 6
+  min_gap_days: 30
+  max_gap_days: 92
+  # Baseline fill averages this many days of observed data on each side of a gap.
+  reference_window_days: 28
+  # Regression imputer: degree-hour hinge temperatures (model choices, not facts about the world).
+  cooling_base_c: 18.0
+  heating_base_c: 10.0
+  # Ridge penalty for the least-squares fit; small, only for numerical stability.
+  ridge_lambda: 1.0
