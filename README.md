@@ -23,6 +23,9 @@ make check                       # ruff + mypy --strict + pytest (offline)
 uv run ridgeline fetch-data      # select 40 sites, cache ~30 MB under data/cache/
 ```
 
+`make check` needs no network, API keys or downloaded data: tests run on small committed fixtures.
+GitHub Actions runs the same `make check` on every push and pull request (`.github/workflows/check.yml`).
+
 Use `uv run ridgeline fetch-data --dev-subset` to fetch only the 10-site development subset
 (about 10 s).
 
