@@ -49,3 +49,11 @@ gaps:
   heating_base_c: 10.0
   # Ridge penalty for the least-squares fit; small, only for numerical stability.
   ridge_lambda: 1.0
+
+# Labeled stand-ins where no eligible real tariff exists (DECISIONS.md ADR-010). Each entry must
+# name an ASSUMPTION in assumptions.yaml. Outputs mark proxied sites with tariff_is_proxy.
+tariff_proxies:
+  - base_tariff_id: 67d08dea7568c8189f03c54e  # MECo G-2 Demand (max 200 kW)
+    eiaid: 11804
+    applies_above_kw: 200
+    assumption_key: g2_proxy_above_200kw

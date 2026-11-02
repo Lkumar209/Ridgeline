@@ -175,6 +175,14 @@ class Tariff(_Frozen):
         description="Set when demand rates were $/kVA and converted to $/kW (rate / PF).",
     )
     is_test_fixture: bool = False
+    proxy_of: str | None = Field(
+        default=None, description="Set on a derived tariff: the real tariff whose values it reuses."
+    )
+    proxy_assumption: str | None = None
+
+    @property
+    def is_proxy(self) -> bool:
+        return self.proxy_of is not None
 
     @field_validator("flat_demand_usd_per_kw_by_month")
     @classmethod

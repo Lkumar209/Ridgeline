@@ -14,11 +14,13 @@ Two documented exceptions:
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
+from ridgeline.config import TariffProxy
 from ridgeline.data.schemas import Site, Tariff, TouSchedule
 
 
@@ -79,6 +81,42 @@ def parse_urdb_record(
         demand_converted_from_kva_at_pf=power_factor if demand_unit == "kVA" else None,
         is_test_fixture=bool(record.get("ridgeline_test_fixture", False)),
     )
+
+
+# --- proxies ----------------------------------------------------------------------------
+
+
+def with_proxies(tariffs: list[Tariff], proxies: list[TariffProxy]) -> list[Tariff]:
+    """`tariffs` plus one derived tariff per proxy rule (DECISIONS.md ADR-010).
+
+    The derived tariff reuses the base tariff's rates unchanged. Only its kW eligibility moves:
+    it starts just above the base tariff's cap and has no upper limit. The id and `proxy_of`
+    make every use of it visible in outputs.
+    """
+    by_id = {t.tariff_id: t for t in tariffs}
+    derived = []
+    for rule in proxies:
+        base = by_id.get(rule.base_tariff_id)
+        if base is None:
+            raise ValueError(f"proxy references unknown tariff {rule.base_tariff_id}")
+        if base.eiaid != rule.eiaid or base.max_peak_kw != rule.applies_above_kw:
+            raise ValueError(
+                f"proxy for {base.tariff_id} must match its EIA id and kW cap "
+                f"({base.eiaid}, {base.max_peak_kw})"
+            )
+        derived.append(
+            base.model_copy(
+                update={
+                    "tariff_id": f"{base.tariff_id}+proxy>{rule.applies_above_kw:g}kW",
+                    # Strictly above the cap, so a site exactly at the cap matches only the base.
+                    "min_peak_kw": math.nextafter(rule.applies_above_kw, math.inf),
+                    "max_peak_kw": None,
+                    "proxy_of": base.tariff_id,
+                    "proxy_assumption": rule.assumption_key,
+                }
+            )
+        )
+    return [*tariffs, *derived]
 
 
 # --- matching ---------------------------------------------------------------------------

@@ -17,7 +17,17 @@ from tests.battery_helpers import FIXTURE
 def _settings_with_tariff_dir(directory: Path) -> Settings:
     settings = load_settings()
     paths = settings.paths.model_copy(update={"tariffs_dir": directory})
-    return settings.model_copy(update={"paths": paths})
+    # No proxies: a proxy needs its real base tariff, which an empty directory lacks.
+    return settings.model_copy(update={"paths": paths, "tariff_proxies": []})
+
+
+def test_proxy_without_its_base_tariff_is_a_config_error(tmp_path: Path) -> None:
+    settings = load_settings()
+    settings = settings.model_copy(
+        update={"paths": settings.paths.model_copy(update={"tariffs_dir": tmp_path})}
+    )
+    with pytest.raises(ValueError, match="unknown tariff"):
+        _tariffs_for(settings, read_sites(settings.resolve(settings.paths.sites_file)), None)
 
 
 def test_simulate_exits_listing_unmatched_sites(

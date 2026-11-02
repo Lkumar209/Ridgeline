@@ -22,6 +22,7 @@ from ridgeline.data.tariffs import (
     load_tariff_file,
     match_tariff,
     tariff_coverage,
+    with_proxies,
 )
 
 app = typer.Typer(help="Ridgeline: rank sites for battery peak shaving (illustrative).")
@@ -64,7 +65,7 @@ def _report(settings: Settings, sites: list[Site], targets: list[Site], cache_di
         ("PAR tier", Counter(s.par_tier for s in sites)),
     ):
         typer.echo(f"  {label}: " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
-    tariffs = load_tariff_dir(settings.resolve(settings.paths.tariffs_dir), _power_factor())
+    tariffs = _load_tariffs(settings)
     coverage = tariff_coverage(sites, tariffs)
     typer.echo(
         f"  tariffs loaded: {len(tariffs)}; sites matched: {len(coverage.matched)}, "
@@ -72,6 +73,12 @@ def _report(settings: Settings, sites: list[Site], targets: list[Site], cache_di
     )
     size_mb = sum(p.stat().st_size for p in cache_dir.rglob("*") if p.is_file()) / 1e6
     typer.echo(f"  cache size: {size_mb:.1f} MB at {cache_dir}")
+
+
+def _load_tariffs(settings: Settings) -> list[Tariff]:
+    """Real tariff files plus the configured, labeled proxies (ADR-010)."""
+    real = load_tariff_dir(settings.resolve(settings.paths.tariffs_dir), _power_factor())
+    return with_proxies(real, settings.tariff_proxies)
 
 
 def _power_factor() -> float:
@@ -117,6 +124,8 @@ def simulate(
     summary.to_csv(out_dir / "simulate_summary.csv", index=False)
     if summary["tariff_is_test_fixture"].any():
         typer.echo("*** TEST FIXTURE TARIFF: dollar figures below are NOT real. ***")
+    if summary["tariff_is_proxy"].any():
+        typer.echo("Note: tariff_is_proxy rows use G-2 values beyond its eligibility (ASSUMPTION).")
     columns = [c for c in SUMMARY_COLUMNS if c in summary]
     typer.echo(summary[columns].round(2).to_string(index=False))
     typer.echo(f"wrote {out_dir}/simulate_monthly.csv and simulate_summary.csv (illustrative)")
@@ -127,6 +136,7 @@ SUMMARY_COLUMNS = [
     "building_type",
     "peak_kw",
     "tariff_id",
+    "tariff_is_proxy",
     "base_bill_usd",
     "practical_savings_usd",
     "oracle_savings_usd",
@@ -140,7 +150,7 @@ def _tariffs_for(settings: Settings, sites: list[Site], override: Path | None) -
     if override is not None:
         (tariff,) = load_tariff_file(override, _power_factor())
         return {s.site_id: tariff for s in sites}
-    tariffs = load_tariff_dir(settings.resolve(settings.paths.tariffs_dir), _power_factor())
+    tariffs = _load_tariffs(settings)
     matched, errors = {}, []
     for site in sites:
         try:

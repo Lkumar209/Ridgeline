@@ -130,6 +130,7 @@ def simulate_sites(
                 "building_type": site.building_type,
                 "peak_kw": site.peak_kw,
                 "tariff_is_test_fixture": tariff.is_test_fixture,
+                "tariff_is_proxy": tariff.is_proxy,
                 **annual_summary(monthly),
             }
         )

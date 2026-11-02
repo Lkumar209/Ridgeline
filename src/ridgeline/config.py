@@ -92,11 +92,21 @@ class GapsConfig(_Frozen):
         return self
 
 
+class TariffProxy(_Frozen):
+    """Apply a real tariff's values beyond its kW eligibility, as a labeled ASSUMPTION (ADR-010)."""
+
+    base_tariff_id: str
+    eiaid: int
+    applies_above_kw: float = Field(gt=0)
+    assumption_key: str
+
+
 class Settings(_Frozen):
     paths: PathsConfig
     comstock: ComStockConfig
     site_selection: SiteSelectionConfig
     gaps: GapsConfig
+    tariff_proxies: list[TariffProxy] = Field(default_factory=list)
 
     def resolve(self, path: Path) -> Path:
         """Interpret a configured path relative to the repository root."""

@@ -63,6 +63,16 @@ bill_scope_delivery_only:
     are excluded from bills, so battery round-trip losses and any energy arbitrage are
     under-valued. Demand-charge savings, the main value stream here, are unaffected.
 
+g2_proxy_above_200kw:
+  value: MECo G-2 values applied to EIA 11804 sites above 200 kW (G-2 applied beyond its eligibility)
+  unit: tariff proxy
+  source: ASSUMPTION
+  notes: >-
+    No secondary-voltage MECo rate for customers above 200 kW has been found yet (the G-3 records
+    found are 115 kV). Real large-customer rates are time-of-use with different demand charges,
+    so savings for these sites are indicative only. M4 sweeps the demand charge by about +/-30%
+    to test whether rankings survive this. To be replaced when a proper G-3 record is found.
+
 meco_g2_urdb_record:
   value: 67d08dea7568c8189f03c54e (approved = false in URDB)
   unit: URDB rate id

@@ -226,3 +226,68 @@ def test_committed_meco_g2_matches_its_published_values() -> None:
         "meco_g2.pdf",
     ]
     assert not g2.is_test_fixture and not g2.ratchet_ignored
+
+
+# --- proxies (ADR-010) ------------------------------------------------------------------
+
+
+def _capped(record: dict[str, Any]) -> Any:
+    record.update(eiaid=11804, peakkwcapacitymax=200)
+    return parse_urdb_record(record, "base")
+
+
+def _rule(**overrides: Any) -> Any:
+    from ridgeline.config import TariffProxy
+
+    fields = {
+        "base_tariff_id": "TEST-FIXTURE-TOU",
+        "eiaid": 11804,
+        "applies_above_kw": 200,
+        "assumption_key": "g2_proxy_above_200kw",
+    }
+    return TariffProxy(**{**fields, **overrides})
+
+
+def test_proxy_covers_sites_above_the_cap_only(record: dict[str, Any]) -> None:
+    from ridgeline.data.tariffs import with_proxies
+
+    tariffs = with_proxies([_capped(record)], [_rule()])
+    big = match_tariff(_site(peak_kw=650.0, eiaid=11804), tariffs)
+    assert big.is_proxy and big.proxy_of == "TEST-FIXTURE-TOU"
+    assert big.tariff_id == "TEST-FIXTURE-TOU+proxy>200kW"
+    assert big.flat_demand_usd_per_kw_by_month == tariffs[0].flat_demand_usd_per_kw_by_month
+    # Exactly at the cap: the real tariff only, never ambiguous.
+    assert not match_tariff(_site(peak_kw=200.0, eiaid=11804), tariffs).is_proxy
+
+
+def test_proxy_keeps_the_usage_minimum(record: dict[str, Any]) -> None:
+    from ridgeline.data.tariffs import with_proxies
+
+    record["peakkwhusagemin"] = 10_000
+    tariffs = with_proxies([_capped(record)], [_rule()])
+    tiny_use = _site(peak_kw=650.0, eiaid=11804).model_copy(update={"mean_kw": 5.0})
+    with pytest.raises(TariffMatchError, match="matches no tariff"):
+        match_tariff(tiny_use, tariffs)
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [({"base_tariff_id": "nope"}, "unknown tariff"), ({"applies_above_kw": 150}, "kW cap")],
+)
+def test_proxy_rule_must_match_its_base(
+    record: dict[str, Any], overrides: dict[str, Any], message: str
+) -> None:
+    from ridgeline.data.tariffs import with_proxies
+
+    with pytest.raises(ValueError, match=message):
+        with_proxies([_capped(record)], [_rule(**overrides)])
+
+
+def test_configured_proxies_name_an_assumption_labeled_as_such() -> None:
+    """Every proxy in config must be backed by an ASSUMPTION entry in assumptions.yaml."""
+    from ridgeline.assumptions import load_assumptions
+    from ridgeline.config import load_settings
+
+    assumptions = load_assumptions()
+    for rule in load_settings().tariff_proxies:
+        assert assumptions[rule.assumption_key].source == "ASSUMPTION"
