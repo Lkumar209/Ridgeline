@@ -71,10 +71,32 @@ class SiteSelectionConfig(_Frozen):
         return self.n_per_type * len(self.building_types)
 
 
+class GapsConfig(_Frozen):
+    """Outage simulation and imputation settings (M2)."""
+
+    seed: int
+    gaps_per_site: int = Field(gt=0)
+    min_gap_days: int = Field(gt=0)
+    max_gap_days: int = Field(gt=0)
+    reference_window_days: int = Field(gt=0)
+    cooling_base_c: float
+    heating_base_c: float
+    ridge_lambda: float = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _ordered(self) -> GapsConfig:
+        if self.min_gap_days > self.max_gap_days:
+            raise ValueError("min_gap_days must not exceed max_gap_days")
+        if self.heating_base_c > self.cooling_base_c:
+            raise ValueError("heating_base_c must not exceed cooling_base_c")
+        return self
+
+
 class Settings(_Frozen):
     paths: PathsConfig
     comstock: ComStockConfig
     site_selection: SiteSelectionConfig
+    gaps: GapsConfig
 
     def resolve(self, path: Path) -> Path:
         """Interpret a configured path relative to the repository root."""
