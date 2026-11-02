@@ -17,6 +17,7 @@ from ridgeline.ranking.sensitivity import (
     RankShift,
     churn_sentence,
     compare_ranks,
+    moves_word,
     neighbour_gap,
     tornado,
     verdict,
@@ -73,24 +74,37 @@ def rank_sites(
 
     base = run(sites)
     base_rank = _ranks(base)
+    # Positions within the seed-to-seed noise are ties, so only bigger moves count as "moved".
+    stability = _seed_stability(sites, inputs, n_draws, seed, base_rank)
+    threshold = max(3, stability.max_move + 1)
+
+    def shift(
+        other: pd.DataFrame, label: str, change: str, base_rank: pd.Series = base_rank
+    ) -> RankShift:
+        return compare_ranks(base_rank, _ranks(other), label, change, threshold=threshold)
+
     n_proxy = sum(s.tariff_is_proxy for s in sites)
     shifts: list[RankShift] = []
     for value in PROXY_SWEEP:
         pinned = run(sites, draws.with_value("proxy_demand_multiplier", value))
         change = f"If the proxy demand charge ({n_proxy} sites above 200 kW) were {_pct(value)}"
-        shifts.append(compare_ranks(base_rank, _ranks(pinned), f"proxy_demand_x{value:g}", change))
+        shifts.append(shift(pinned, f"proxy_demand_x{value:g}", change))
     everyone_proxy = [s.model_copy(update={"tariff_is_proxy": True}) for s in sites]
     for value in PROXY_SWEEP:
         everyone = run(everyone_proxy, draws.with_value("proxy_demand_multiplier", value))
-        change = f"If every site's demand charge were {_pct(value)}"
-        shifts.append(compare_ranks(base_rank, _ranks(everyone), f"all_demand_x{value:g}", change))
-
+        shifts.append(
+            shift(
+                everyone,
+                f"all_demand_x{value:g}",
+                f"If every site's demand charge were {_pct(value)}",
+            )
+        )
     no_churn = run(sites, churn=False)
     churn_shift = compare_ranks(
-        _ranks(no_churn), base_rank, "churn_on_vs_off", "Adding tenant churn"
+        _ranks(no_churn), base_rank, "churn_on_vs_off", "Adding tenant churn", threshold=threshold
     )
     shifts.append(churn_shift)
-
+    shifts.append(stability)
     base = base.merge(breakeven_capex(sites, inputs), on="site_id")
     gap = neighbour_gap(base)
     explanations = {
@@ -100,11 +114,32 @@ def rank_sites(
             f"${gap:,.0f} of bad-case value, so small input changes can swap neighbours "
             "without changing the overall picture."
         ),
+        "rank_stability": (
+            f"Re-running with a different random seed moves no site more than "
+            f"{stability.max_move} places, so treat sites within {stability.max_move} places of "
+            f"each other as tied; below, a site only counts as moved if it shifts {threshold} or "
+            "more places."
+        ),
         "proxy_tariff": _proxy_sentence(shifts[:2], n_proxy),
         "all_demand": _all_demand_sentence(shifts[2:4]),
         "tenant_churn": churn_sentence(base, no_churn, churn_shift),
     }
-    return RankingResult(base, tornado(sites, inputs), shifts, explanations)
+    return RankingResult(base, tornado(sites, inputs, threshold), shifts, explanations)
+
+
+def _seed_stability(
+    sites: list[SiteEconomics],
+    inputs: EconomicInputs,
+    n_draws: int,
+    seed: int,
+    base_rank: pd.Series,
+) -> RankShift:
+    """How much the ranking moves from Monte Carlo sampling alone (a second seed)."""
+    other = seed + 1
+    draws = sample_draws(inputs, n_draws, other)
+    rand = site_randomness(sites, n_draws, inputs.life_years, inputs.savings_noise_sd, other)
+    rerun = summarize_npv(run_monte_carlo(sites, inputs, draws, rand), sites)
+    return compare_ranks(base_rank, _ranks(rerun), "seed_stability", "Changing the random seed")
 
 
 def breakeven_capex(sites: list[SiteEconomics], inputs: EconomicInputs) -> pd.DataFrame:
@@ -139,29 +174,35 @@ def _proxy_sentence(shifts: list[RankShift], n_proxy: int) -> str:
     return (
         f"If the stand-in tariff used for the {n_proxy} large sites is off by 30% either way, "
         f"{verdict(worst.moved, worst.n_sites)}: at most {worst.moved} of {worst.n_sites} sites "
-        f"move 3 or more places, and at least {kept} of the top 10 stay in the top 10."
+        f"{moves_word(worst.moved)} {worst.threshold} or more places, and at least {kept} of the "
+        "top 10 stay in the top 10."
     )
 
 
 def _all_demand_sentence(shifts: list[RankShift]) -> str:
     worst = max(shifts, key=lambda s: s.moved)
     return (
-        "If every site's demand charge moved 30% together, each site's value would change a lot "
-        f"but {verdict(worst.moved, worst.n_sites)}: at most {worst.moved} of {worst.n_sites} "
-        "sites move 3 or more places."
+        "If every site's demand charge moved 30% together, each site's value would change a lot; "
+        f"as for the order, {verdict(worst.moved, worst.n_sites)}: at most {worst.moved} of "
+        f"{worst.n_sites} sites {moves_word(worst.moved)} {worst.threshold} or more places."
     )
 
 
 def _headline(ranking: pd.DataFrame, inputs: EconomicInputs, n_draws: int) -> str:
     best = ranking.iloc[0]
     capex = inputs.capex_usd_per_kw.central
-    share = float((ranking["p_npv_positive"] > 0).mean())
+    any_positive = ranking[ranking["p_npv_positive"] > 0]
     best_breakeven = float(ranking["breakeven_capex_usd_per_kw"].max())
-    viable = (
-        f"No site pays for itself in any of the {n_draws:,} simulated futures"
-        if share == 0
-        else f"{share:.0%} of sites pay for themselves in at least some simulated futures"
-    )
+    if any_positive.empty:
+        viable = f"No site pays for itself in any of the {n_draws:,} simulated futures"
+    else:
+        best_count = round(float(any_positive["p_npv_positive"].max()) * n_draws)
+        count = len(any_positive)
+        viable = (
+            f"Only {count} of {len(ranking)} sites {'pays' if count == 1 else 'pay'} for "
+            f"{'itself' if count == 1 else 'themselves'} in any of the {n_draws:,} simulated "
+            f"futures, and at best in {best_count:,} of them"
+        )
     return (
         f"{viable}; even the top-ranked site ({best['site_id']}) has a good-case (P90) NPV of "
         f"{usd(best['npv_p90'])}. In the central case the best site breaks even only if the "

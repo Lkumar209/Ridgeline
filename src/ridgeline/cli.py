@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections import Counter
@@ -215,6 +216,10 @@ def rank(
     result.ranking.to_csv(out_dir / "ranking.csv", index=False)
     result.tornado.to_csv(out_dir / "tornado.csv", index=False)
     pd.DataFrame([vars(s) for s in result.shifts]).to_csv(out_dir / "rank_shifts.csv", index=False)
+    meta = {"n_draws": n_draws, "seed": settings.scenarios.seed, "seconds": round(elapsed, 2)}
+    (out_dir / "explanations.json").write_text(
+        json.dumps({"run": meta, "explanations": result.explanations}, indent=2)
+    )
     columns = [
         "rank",
         "site_id",

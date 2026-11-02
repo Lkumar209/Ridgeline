@@ -64,4 +64,5 @@ tariff_proxies:
 scenarios:
   # 15-year Monte Carlo (M4). Every economic input and its range is in assumptions.yaml.
   seed: 2026
-  n_draws: 2000
+  # 8000: seed-to-seed P10 noise ~$300 vs ~$1,900 at 2000 draws (docs/m4_ranking.md).
+  n_draws: 8000

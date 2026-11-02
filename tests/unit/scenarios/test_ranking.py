@@ -49,6 +49,7 @@ def test_rank_sites_gives_every_explanation() -> None:
     assert set(result.explanations) == {
         "headline",
         "closeness",
+        "rank_stability",
         "proxy_tariff",
         "all_demand",
         "tenant_churn",
