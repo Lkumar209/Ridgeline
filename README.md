@@ -9,8 +9,8 @@ demand-charge tariff, then runs a 15-year Monte Carlo cash-flow model.
 > not anyone's production model. Every assumption is listed in `assumptions.yaml` with a source
 > URL or the label `ASSUMPTION`.
 
-**Status:** M1. Data layer done: 40 real ComStock sites selected and cached, schemas, and tariff
-loader. Battery, scenarios, ranking, API and agent come in later milestones (see the PRs).
+**Status:** M2. Data layer, plus meter-gap imputation validated on 240 simulated outages (`docs/m2_imputation.md`).
+Battery, scenarios, ranking, API and agent come in later milestones.
 
 ## Quickstart
 
@@ -31,6 +31,7 @@ Use `uv run ridgeline fetch-data --dev-subset` to fetch only the 10-site develop
 | Path | What |
 |---|---|
 | `src/ridgeline/data/` | Loaders and boundary schemas: ComStock loads, weather, tariffs, sites |
+| `src/ridgeline/gaps/` | Meter-outage simulation and imputation (M2); results in `docs/m2_imputation.md` |
 | `src/ridgeline/config.py` | Run settings from `config/default.yaml` |
 | `src/ridgeline/assumptions.py` | Loads `assumptions.yaml`; rejects unsourced numbers |
 | `src/ridgeline/cli.py` | `fetch-data`, plus stubs for `simulate`, `rank` and `serve` |
@@ -39,8 +40,10 @@ Use `uv run ridgeline fetch-data --dev-subset` to fetch only the 10-site develop
 | `data/fixtures/` | Small real-data samples so tests run offline |
 | `data/cache/` | Downloaded data (gitignored) |
 | `tests/` | `unit/`, `property/` (hypothesis); `golden/` and `e2e/` arrive with ranking |
+| `scripts/` | Fixture builder and the M2 experiment and plot scripts |
+| `docs/` | Milestone write-ups and figures |
 | `spikes/` | The M0 data-feasibility report and probe script |
 | `DECISIONS.md`, `LIMITATIONS.md`, `AI_LOG.md` | Why things are the way they are, what is not modeled, and how AI output was checked |
 
-Future milestones: `gaps/` (M2), `battery/` (M3), `scenarios/` and `ranking/` (M4), `api/` and `web/`
+Future milestones: `battery/` (M3), `scenarios/` and `ranking/` (M4), `api/` and `web/`
 (M5), `agent/` (M6). `ONBOARDING.md` arrives in M7.

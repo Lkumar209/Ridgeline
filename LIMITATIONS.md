@@ -18,6 +18,17 @@ list grows each milestone.
   They are not a representative sample of MA buildings, and the rule deliberately over-represents
   flat (low peak-to-average) loads to spread the ranking.
 
+## Gap imputation (M2)
+- **Validated on modeled data.** The imputers were scored by hiding stretches of clean ComStock
+  data. Real meters add noise, partial outages, and outages that hit neighboring sites together
+  (storms), so real-world errors will be larger.
+- **The peer method looks better than it would in reality.** Same-type ComStock buildings share
+  prototype schedules, so peers track each other unrealistically well. It is not the default for
+  this reason (ADR-007).
+- **Schools and strip malls are the hardest** (about 10–13% median peak error even for the regression),
+  because academic calendars and tenant mixes are not features.
+- **Calendar months stand in for billing cycles.**
+
 ## Tariffs
 - **Supported structure.** Energy charges by time-of-use period, monthly flat demand charges,
   time-of-use demand charges, and a monthly fixed charge. Tiered rates, per-day fixed charges and

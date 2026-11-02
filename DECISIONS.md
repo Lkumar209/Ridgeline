@@ -101,3 +101,26 @@ and doesn't match URDB.
 
 The cloud session can push only `claude/dazzling-cori-pty3ol`. Each milestone is one PR from that
 branch into `main`. After a merge, the branch restarts from the new `main`.
+
+## ADR-007: Gap imputation, regression on weather and time; judge by billing peaks (M2)
+
+**Context.** Meter outages of 1–3 months must be filled before billing simulation. What matters
+is each month's peak kW (it sets the demand charge), not interval MAE.
+
+**Decision.** The default imputer is ridge least squares on weekday/weekend × 15-min-slot dummies plus
+cooling and heating degree terms, fit on the site's own observed data (`gaps/impute_model.py`). The
+seasonal-profile fill is kept as the baseline. A peer-site feature is available but not the
+default. Methods are scored on monthly peak error and bias, with MAE/MAPE secondary
+(`docs/m2_imputation.md`).
+
+**Why not peers by default.** On ComStock, same-type buildings share prototype schedules, so the
+peer signal is unrealistically clean. Even so, its median peak error was mixed: better in summer,
+worse otherwise.
+
+**Rejected.** Gradient boosting or other ML libraries: a new dependency, harder to explain, and
+the linear model already removes most of the bias. Hourly dummies: they flatten intra-hour peaks
+(measured, see the M2 doc). Hinge temperatures and ridge λ live in `config/default.yaml` as
+modeling choices, not facts.
+
+**Consequence.** Imputed months still carry about ±25% peak error in the tails. M4 must sample that
+error rather than treat filled data as known.
