@@ -13,6 +13,7 @@ dependencies = [
     "pyarrow>=26.0.0",
     "pydantic>=2",
     "pyyaml>=6.0.3",
+    "scipy>=1.17.1",
     "typer>=0.27.3",
 ]
 
@@ -31,6 +32,7 @@ dev = [
     "pandas-stubs>=3.1.0.261029",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
+    "scipy-stubs>=1.17.1.5",
     "types-pyyaml>=6.0.12.20261030",
 ]
 
