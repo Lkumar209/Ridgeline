@@ -170,3 +170,43 @@ units, which gives a wrong $/kW by a factor of 1/PF.
 
 **Dependency.** scipy (runtime) for the LP; scipy-stubs (dev) for typing. A one-line type ignore
 covers the stubs not declaring sparse-matrix support in `linprog`.
+
+## ADR-010: Tariff coverage, a labeled G-2 proxy and the NSTAR replacement (M3)
+
+**Context.** The only usable real tariff is MECo G-2 (EIA 11804, ≤ 200 kW, average use
+> 10,000 kWh/month). It covered 13 of the original 40 sites. No usable NSTAR (EIA 54913) rate was
+found, and the MECo G-3 records found are 115 kV service.
+
+**Decision** (project owner, from the options in `docs/m3_dispatch.md`):
+1. **Usage eligibility uses the average month.** The tariff text says "average use will exceed
+   10,000 kWh/month".
+2. **Proxy for large 11804 sites.** Sites above 200 kW are billed on G-2's rates via
+   `tariff_proxies` in config. The proxy is labeled `g2_proxy_above_200kw` (ASSUMPTION), carries
+   the id `…+proxy>200kW` and is flagged `tariff_is_proxy` in every output. A test requires each
+   proxy to name an ASSUMPTION.
+3. **NSTAR sites replaced.** The 5 NSTAR sites are swapped for 11804 sites of the same building
+   type and PAR tier (`replace_utility_eiaids: [54913]`). This uses a separate seeded draw, so the
+   other 35 sites are unchanged; a test enforces that.
+   - cs-38821 → cs-9978 (RetailStripmall, mid)
+   - cs-42670 → cs-65325 (FullServiceRestaurant, mid)
+   - cs-65258 → cs-45394 (PrimarySchool, mid)
+   - cs-104743 → cs-106921 (SecondarySchool, high)
+   - cs-104750 → cs-39283 (SecondarySchool, low)
+4. **Keep looking for a real large-customer rate (G-3).** In M4, the demand charge is swept by
+   about ±30% so the ranking shows whether it survives a wrong proxy.
+
+**Coverage now.**
+
+| | Real G-2 | G-2 proxy (> 200 kW) |
+|---|---|---|
+| All 40 sites | 17 | 23 |
+| Dev subset (10) | 6 | 4 |
+
+**Rejected.**
+- **Re-selecting all 40 from 11804 only:** it would have reshuffled the 35 kept sites and the dev
+  subset for no reason.
+- **Proxying NSTAR with a MECo tariff:** a different utility, which stretches too far.
+- **Inventing a G-3 rate:** violates principle 2.
+
+**Consequence.** The M2 imputation results (`docs/m2_imputation.md`) were computed on the
+original site list. Rerunning `scripts/evaluate_imputation.py` refreshes them.

@@ -35,6 +35,9 @@ site_selection:
   # The two utilities serving ~75% of screened candidates. Restricting to them means two
   # utilities' tariffs cover every site. IDs are EIA utility numbers from ComStock metadata.
   utility_eiaids: [11804, 54913]
+  # NSTAR (54913) has no usable tariff, so its 5 sites are swapped for EIA 11804 sites of the
+  # same building type and PAR tier; the other 35 sites are unchanged (DECISIONS.md ADR-010).
+  replace_utility_eiaids: [54913]
 
 gaps:
   # Simulated meter outages (M2). Lengths are drawn uniformly in days.

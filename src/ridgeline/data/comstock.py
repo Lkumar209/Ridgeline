@@ -141,7 +141,40 @@ def select_sites(meta: pd.DataFrame, cfg: SiteSelectionConfig) -> list[Site]:
         per_type.append(_interleave_tiers(by_tier, start=type_index))
 
     ordered = _round_robin(per_type)
+    if cfg.replace_utility_eiaids:
+        ordered = _replace_utilities(ordered, candidates, cfg)
     return [_row_to_site(row, dev_subset=i < cfg.dev_subset_size) for i, row in enumerate(ordered)]
+
+
+def _replace_utilities(
+    ordered: list[pd.Series], candidates: pd.DataFrame, cfg: SiteSelectionConfig
+) -> list[pd.Series]:
+    """Swap out sites served by `cfg.replace_utility_eiaids` (ADR-010).
+
+    Each replacement comes from the same building type and PAR tier, from a utility not being
+    replaced, and keeps the original's position (so the dev subset keeps its size and mix).
+    A separate seeded generator is used, so every site that is not replaced stays identical.
+    """
+    rng = np.random.default_rng([cfg.seed, 1])
+    replace = set(cfg.replace_utility_eiaids)
+    taken = {int(row["bldg_id"]) for row in ordered}
+    out = []
+    for row in ordered:
+        if int(row["utility_eiaid"]) not in replace:
+            out.append(row)
+            continue
+        pool = candidates[
+            (candidates["building_type"] == row["building_type"])
+            & (candidates["par_tier"] == row["par_tier"])
+            & ~candidates["utility_eiaid"].isin(replace)
+            & ~candidates["bldg_id"].isin(taken)
+        ]
+        if pool.empty:
+            raise ValueError(f"no replacement for bldg {row['bldg_id']} in its stratum")
+        pick = pool.iloc[int(rng.integers(len(pool)))]
+        taken.add(int(pick["bldg_id"]))
+        out.append(pick)
+    return out
 
 
 def _interleave_tiers(by_tier: dict[str, list[pd.Series]], start: int) -> list[pd.Series]:

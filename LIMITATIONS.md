@@ -52,17 +52,21 @@ list grows each milestone.
   as idle. This assumes the operator can tell, which slightly flatters the controller.
 - **No export, and no wholesale or demand-response revenue.**
 
-## MECo G-2 tariff (pending the committed file)
-- **Delivery service only.** Supply (basic service) energy costs are excluded, so round-trip
-  losses and energy arbitrage are under-valued (`bill_scope_delivery_only`).
-- **Unapproved record.** The URDB record is marked `approved: false`. Its source is National Grid's
-  `meco_g2.pdf` (`meco_g2_urdb_record`).
-- **kVA clause.** Billing demand has a kVA clause above 75 kW. We bill on the 15-min kW peak
-  instead (`billing_demand_basis`, ASSUMPTION).
-- **Load zone.** The record is labeled for the SEMA load zone, while our sites' counties are in other
-  zones. That should not affect delivery charges, but it would matter if supply were ever included.
-- **Coverage.** Eligibility is ≤ 200 kW, so it covers only 13 of the 40 sites (4 of 10 dev sites). See
-  `docs/m3_dispatch.md` for the options.
+## MECo G-2 tariff (`data/tariffs/meco_g2_sema.json`)
+- **Delivery service only.** The record's `servicetype` is Delivery. Supply (basic service) energy
+  costs are excluded, so round-trip losses and energy arbitrage are under-valued
+  (`bill_scope_delivery_only`). Demand-charge savings are unaffected.
+- **Unapproved record.** The URDB record is marked `approved: false`. Its sources are National
+  Grid's `meco_delivery.pdf`, `meco_basic_service.pdf` and `meco_g2.pdf`.
+- **Billing demand simplified to the 15-min kW peak.** The tariff also has a clause of 90% of the
+  kVA peak above 75 kW, and a 5 kW floor. At our assumed power factor of 0.90, the kVA clause gives
+  the same number (`billing_demand_basis`).
+- **Load zone.** The record is labeled for the SEMA load zone. That should not change delivery
+  charges, but it would matter if supply were included.
+- **Eligibility.** The tariff applies up to 200 kW, with average use above 10,000 kWh/month.
+  - EIA 11804 sites above 200 kW are billed on G-2 values as a labeled proxy (ADR-010). Their
+    savings are indicative only; a real large-customer rate (G-3) is time-of-use.
+  - M4 sweeps the demand charge by about ±30% to test whether rankings survive a wrong proxy.
 
 ## Not modeled (by design, per the brief)
 - Wholesale market, capacity or demand-response revenue.

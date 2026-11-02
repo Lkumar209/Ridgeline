@@ -169,3 +169,24 @@ def test_check_full_year_rejects_missing_or_negative(bad: float) -> None:
     series.iloc[100] = bad
     with pytest.raises(ValueError, match="missing or negative"):
         check_full_year(series)
+
+
+def test_replacement_swaps_only_the_named_utility(selection_cfg: SiteSelectionConfig) -> None:
+    """ADR-010: dropping a utility must leave every other selected site untouched."""
+    meta = make_slim_metadata()
+    # The default config already replaces 54913, so build the "before" case explicitly.
+    no_swap = selection_cfg.model_copy(update={"replace_utility_eiaids": []})
+    before = select_sites(meta, no_swap)
+    assert any(s.utility_eiaid == 54913 for s in before)  # the test is not vacuous
+    cfg = no_swap.model_copy(update={"replace_utility_eiaids": [54913]})
+    after = select_sites(meta, cfg)
+    assert len(after) == len(before)
+    assert all(s.utility_eiaid != 54913 for s in after)
+    assert len({s.bldg_id for s in after}) == len(after)
+    for old, new in zip(before, after, strict=True):
+        if old.utility_eiaid == 54913:
+            assert (new.building_type, new.par_tier) == (old.building_type, old.par_tier)
+        else:
+            assert new == old
+    assert [s.dev_subset for s in after] == [s.dev_subset for s in before]
+    assert select_sites(meta, cfg) == after  # deterministic

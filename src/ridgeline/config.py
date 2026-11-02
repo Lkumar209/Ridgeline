@@ -55,6 +55,11 @@ class SiteSelectionConfig(_Frozen):
     utility_eiaids: list[int] | None = Field(
         default=None, description="Keep only sites served by these utilities (EIA IDs)."
     )
+    replace_utility_eiaids: list[int] = Field(
+        default_factory=list,
+        description="After selection, swap these utilities' sites for same-type, same-tier "
+        "sites from other utilities, leaving every other site unchanged (ADR-010).",
+    )
 
     @model_validator(mode="after")
     def _consistent(self) -> SiteSelectionConfig:
