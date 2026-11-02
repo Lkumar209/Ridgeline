@@ -39,3 +39,12 @@ def test_every_assumption_is_sourced_or_labeled() -> None:
 def test_unsourced_assumptions_are_rejected(fields: dict[str, object]) -> None:
     with pytest.raises(ValidationError):
         parse_assumptions({"x": fields})
+
+
+def test_ranges_must_bracket_the_value() -> None:
+    base = {"unit": "x", "source": "ASSUMPTION", "notes": "n"}
+    parse_assumptions({"ok": {**base, "value": 1.0, "low": 0.5, "high": 2.0}})
+    with pytest.raises(ValidationError, match="low <= value <= high"):
+        parse_assumptions({"x": {**base, "value": 3.0, "low": 0.5, "high": 2.0}})
+    with pytest.raises(ValidationError, match="both low and high"):
+        parse_assumptions({"x": {**base, "value": 1.0, "low": 0.5}})

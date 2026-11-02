@@ -60,3 +60,8 @@ tariff_proxies:
     eiaid: 11804
     applies_above_kw: 200
     assumption_key: g2_proxy_above_200kw
+
+scenarios:
+  # 15-year Monte Carlo (M4). Every economic input and its range is in assumptions.yaml.
+  seed: 2026
+  n_draws: 2000

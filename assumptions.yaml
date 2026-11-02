@@ -91,3 +91,155 @@ comstock_load_data:
   notes: >-
     Modeled (EnergyPlus) buildings, not metered sites. Timestamps are local standard time
     (UTC-5) and interval-ending; verified empirically in M1 (see DECISIONS.md ADR-003).
+
+# --- M4: 15-year cash flow and Monte Carlo ------------------------------------------------------
+# Where low/high are given, the Monte Carlo draws uniformly between them and the tornado moves
+# one input at a time to each end. All money is in real (inflation-adjusted) 2025 dollars.
+
+battery_capex_usd_per_kw:
+  value: 1427.61
+  low: 1118.26
+  high: 1784.03
+  unit: $/kW of power, 2022$, commercial 2-hour battery, installed in 2026
+  source: https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/parquet/2024/v3.0.0/ATBe.parquet
+  notes: >-
+    NREL Annual Technology Baseline 2024 v3: technology "Commercial Battery Storage", techdetail
+    "2Hr Battery Storage", core_metric_parameter CAPEX, core_metric_case Market, year 2026. Value is
+    the Moderate scenario; low and high are Advanced and Conservative. Our 125 kW / 250 kWh battery
+    is 2-hour. Converted to 2025$ with usd_2022_to_2025_factor.
+
+battery_fixed_om_usd_per_kw_year:
+  value: 34.40
+  low: 26.95
+  high: 42.99
+  unit: $/kW-year, 2022$
+  source: https://oedi-data-lake.s3.amazonaws.com/ATB/electricity/parquet/2024/v3.0.0/ATBe.parquet
+  notes: >-
+    Same ATB row set as battery_capex_usd_per_kw, core_metric_parameter "Fixed O&M", year 2026,
+    Moderate (Advanced to Conservative range).
+
+usd_2022_to_2025_factor:
+  value: 1.10
+  unit: ratio (2025$ / 2022$)
+  source: ASSUMPTION
+  notes: >-
+    Approximate cumulative US consumer inflation 2022 to 2025, used to put ATB costs (2022$) and the
+    2025 tariff in the same dollars. Not taken from an official index in this repo.
+
+discount_rate_real:
+  value: 0.05
+  low: 0.03
+  high: 0.08
+  unit: fraction per year (real)
+  source: ASSUMPTION
+  notes: Owner's real cost of capital for a small commercial project. Placeholder range.
+
+tariff_escalation_real:
+  value: 0.0
+  low: -0.01
+  high: 0.02
+  unit: fraction per year above inflation
+  source: ASSUMPTION
+  notes: How fast delivery rates grow beyond inflation. Applied to demand and energy charges alike.
+
+upfront_incentive_fraction:
+  value: 0.15
+  low: 0.0
+  high: 0.30
+  unit: fraction of capex
+  source: ASSUMPTION
+  notes: >-
+    Stands in for upfront incentives (federal tax credit, state programs) whose availability and
+    eligibility for a given project are uncertain. 0 means none. Not a statement of any program's terms.
+
+capacity_fade_per_year:
+  value: 0.02
+  low: 0.01
+  high: 0.03
+  unit: fraction of usable capacity lost per year
+  source: ASSUMPTION
+  notes: >-
+    Savings are assumed to scale linearly with remaining capacity (a simplification; see
+    LIMITATIONS.md). No augmentation or replacement within the project life.
+
+proxy_demand_charge_multiplier:
+  value: 1.0
+  low: 0.7
+  high: 1.3
+  unit: multiplier on demand-charge savings, proxy-tariff sites only
+  source: ASSUMPTION
+  notes: >-
+    About +/-30% at the project owner's request: how wrong the G-2 proxy (sites above 200 kW,
+    g2_proxy_above_200kw) could be. Sites on the real G-2 tariff are not multiplied.
+
+annual_savings_noise_sd:
+  value: 0.10
+  unit: standard deviation of a yearly multiplicative factor on savings
+  source: ASSUMPTION
+  notes: >-
+    Stands in for year-to-year load variation, which one weather year of ComStock data cannot show.
+    Lognormal with mean 1.
+
+project_life_years:
+  value: 15
+  unit: years
+  source: ASSUMPTION
+  notes: Horizon from the project brief. No residual value at the end.
+
+tenant_churn_multiplier:
+  value: 1.0
+  low: 0.5
+  high: 2.0
+  unit: multiplier on every tenant_churn_hazard_* value
+  source: ASSUMPTION
+  notes: Uncertainty in the churn hazards themselves.
+
+tenant_churn_hazard_MediumOffice:
+  value: 0.06
+  unit: probability per year that the host tenant leaves and the project ends
+  source: ASSUMPTION
+  notes: >-
+    When the tenant leaves, savings and O&M stop and the battery has no resale value (conservative:
+    a new tenant could keep it). Hazards are relative guesses by building type, not measured rates.
+
+tenant_churn_hazard_RetailStripmall:
+  value: 0.10
+  unit: probability per year
+  source: ASSUMPTION
+  notes: Small-format retail turns over more often than offices. Same caveats as MediumOffice.
+
+tenant_churn_hazard_RetailStandalone:
+  value: 0.08
+  unit: probability per year
+  source: ASSUMPTION
+  notes: Same caveats as MediumOffice.
+
+tenant_churn_hazard_FullServiceRestaurant:
+  value: 0.12
+  unit: probability per year
+  source: ASSUMPTION
+  notes: Restaurants have the highest assumed turnover. Same caveats as MediumOffice.
+
+tenant_churn_hazard_Warehouse:
+  value: 0.06
+  unit: probability per year
+  source: ASSUMPTION
+  notes: Same caveats as MediumOffice.
+
+tenant_churn_hazard_Outpatient:
+  value: 0.04
+  unit: probability per year
+  source: ASSUMPTION
+  notes: Medical tenants are assumed sticky. Same caveats as MediumOffice.
+
+tenant_churn_hazard_PrimarySchool:
+  value: 0.01
+  unit: probability per year
+  source: ASSUMPTION
+  notes: Schools are usually owner-occupied; the hazard stands in for closure or consolidation.
+
+tenant_churn_hazard_SecondarySchool:
+  value: 0.01
+  unit: probability per year
+  source: ASSUMPTION
+  notes: Same as PrimarySchool.
