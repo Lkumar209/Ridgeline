@@ -10,7 +10,7 @@ import httpx
 import typer
 
 from ridgeline.assumptions import load_assumptions
-from ridgeline.battery.simulate import simulate_sites
+from ridgeline.battery.simulate import History, simulate_sites
 from ridgeline.config import Settings, load_settings
 from ridgeline.data import comstock
 from ridgeline.data.comstock import load_cached_timeseries
@@ -102,6 +102,12 @@ def simulate(
         "results are labeled with the tariff id.",
     ),
     optimal: bool = typer.Option(True, help="Also solve the perfect-foresight LP bound."),
+    wraparound_lookahead: bool = typer.Option(
+        False,
+        "--wraparound-lookahead",
+        help="Seed the first month's threshold from the last month of the same year. This uses "
+        "future information; for comparison only (default: battery idle in the first month).",
+    ),
     config: Path | None = typer.Option(None, help="Config file (default: config/default.yaml)."),
 ) -> None:
     """Simulate battery dispatch and monthly bills for each site (illustrative)."""
@@ -116,7 +122,12 @@ def simulate(
         raise typer.Exit(code=1)
     loads = {s.site_id: load_cached_timeseries(cache / f"{s.bldg_id}.parquet") for s in sites}
     spec = BatterySpec.from_assumptions(load_assumptions())
-    monthly, summary = simulate_sites(sites, loads, tariffs, spec, with_optimal=optimal)
+    history: History = "wraparound" if wraparound_lookahead else "causal"
+    monthly, summary = simulate_sites(
+        sites, loads, tariffs, spec, with_optimal=optimal, history=history
+    )
+    if wraparound_lookahead:
+        typer.echo("*** LOOKAHEAD: first month uses the last month of the same year. ***")
 
     out_dir = settings.resolve(settings.paths.cache_dir) / "results"
     out_dir.mkdir(parents=True, exist_ok=True)

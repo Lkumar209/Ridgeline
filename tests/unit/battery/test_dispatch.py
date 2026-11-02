@@ -94,3 +94,31 @@ def test_optimal_never_exports_with_tiny_loads() -> None:
     prices = interval_prices(index, fixture_tariff())
     run = optimal_dispatch(load, prices, np.arange(4), spec, DT)
     assert run.net_kw.min() >= 0.0
+
+
+def _two_months() -> pd.Series:
+    return office_like_load(59)  # Jan + Feb 2018 in local time
+
+
+def test_causal_history_leaves_first_month_idle() -> None:
+    """Regression: January used to borrow December of the same year (future information)."""
+    from ridgeline.battery.simulate import simulate_site
+
+    monthly = simulate_site(_two_months(), fixture_tariff(), SPEC, with_optimal=False)
+    jan, feb = monthly.loc["2018-01"], monthly.loc["2018-02"]
+    assert jan["practical_no_history"] and not jan["practical_history_is_lookahead"]
+    assert jan["practical_bill_usd"] == jan["base_bill_usd"]
+    assert not feb["practical_no_history"]
+    bills = monthly[["practical_bill_usd", "base_bill_usd"]].to_dict(orient="index")
+    assert bills["2018-02"]["practical_bill_usd"] < bills["2018-02"]["base_bill_usd"]
+
+
+def test_wraparound_is_flagged_as_lookahead() -> None:
+    from ridgeline.battery.simulate import simulate_site
+
+    monthly = simulate_site(
+        _two_months(), fixture_tariff(), SPEC, with_optimal=False, history="wraparound"
+    )
+    assert monthly.loc["2018-01", "practical_history_is_lookahead"]
+    bills = monthly[["practical_bill_usd", "base_bill_usd"]].to_dict(orient="index")
+    assert bills["2018-01"]["practical_bill_usd"] < bills["2018-01"]["base_bill_usd"]
