@@ -45,9 +45,12 @@ list grows each milestone.
 - **The practical controller only defends one threshold** (the all-hours monthly peak). It ignores
   energy prices and TOU-demand windows, so under TOU tariffs it leaves arbitrage and window-specific
   savings to the LP bound.
-- **The persistence forecast is crude.** January's starting threshold comes from December of the
-  same (single) data year. Capture versus perfect foresight is a median 57% on the dev subset
-  (flat-demand structure).
+- **The persistence forecast is crude.** Each month starts at the threshold that would have held
+  last month. Median capture versus perfect foresight is 51% on the dev subset under G-2.
+- **The first month is idle.** With a single data year there is no history before January, so the
+  practical battery does nothing that month. That is causal but slightly pessimistic; a real site
+  would have last year's data. The earlier December wraparound was a lookahead and is now only an
+  opt-in comparison (`--wraparound-lookahead`).
 - **Idle months.** If dispatch would cost more than no battery in a month, that month is billed
   as idle. This assumes the operator can tell, which slightly flatters the controller.
 - **No export, and no wholesale or demand-response revenue.**

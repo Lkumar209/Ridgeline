@@ -131,8 +131,10 @@ error rather than treat filled data as known.
 - **Billing:** each local calendar month is billed and simulated independently, with the
   battery starting full.
 - **Practical controller:** a threshold rule with a ratchet. Its starting threshold is the lowest
-  threshold it could have held over the *previous* month (persistence: history only). January
-  uses December of the same data year because we have one weather year.
+  threshold it could have held over the *previous* month (persistence: history only). The first
+  month of the data has no history, so the battery is idle that month. *(Amended: originally
+  January borrowed December of the same data year, which is a lookahead. It was removed at the
+  project owner's request; median capture on the original dev subset went from 0.565 to 0.544.)*
 - **Upper bound:** a perfect-foresight LP per month (scipy HiGHS, sparse) defines the capture ratio.
 - **Diagnostic:** an "oracle threshold" run isolates the threshold forecast from the rule itself.
 - **Idle guard:** a month whose dispatch costs more than no battery is billed idle and flagged,

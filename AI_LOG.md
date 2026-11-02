@@ -128,3 +128,34 @@ it was caught. Newest milestone at the bottom.
    savings with energy arbitrage the threshold rule never attempts. Added a flat-demand-only run,
    which showed the rule matches the LP's peak cut when given the right threshold. The capture gap is a
    forecasting problem.
+
+### M3 follow-up: real tariff, proxy, NSTAR replacement, lookahead fix
+
+**Key prompts**
+- The user attached the G-2 URDB JSON and decided: average-month usage eligibility; G-2 as a
+  labeled proxy above 200 kW; replace the 5 NSTAR sites from the same strata; fix or label the
+  January lookahead and report the effect; real dollar savings on the dev subset.
+
+**What was wrong or rejected, and how it was caught**
+1. *Multi-URL `source` silently glued into one invalid URL.* The URDB `source` field held three PDF
+   links separated by blank lines. Pydantic's HttpUrl stripped the whitespace and produced
+   `…meco_delivery.pdfhttps://…` with no error. Caught by printing the parsed tariff during
+   validation instead of trusting "it parsed". Fixed with a list of URLs and a regression test.
+   This is the main reason for the data-contract test on the committed file.
+2. *I had constructed the URDB link as `/USURDB/…`; the real record says `/IURDB/…`.* It was marked
+   "unverified" in `assumptions.yaml`. Caught by comparing against the record's own `uri` once the
+   file arrived. Corrected.
+3. *A commit was made with a failing test.* A `make check | grep … && git commit` chain does not stop
+   on failure, because the pipe hides make's exit code. Caught one step later by reading the test
+   output. The unpushed commit was amended after the fix. Since then, commits are gated on make's
+   real exit code.
+4. *The failing test was vacuous.* The site-replacement test inherited the default config, which by
+   then already replaced NSTAR, so "before" and "after" were the same. The guard assertion I had added
+   ("the selection contains NSTAR sites") is what failed. Fixed by building the before case
+   explicitly.
+5. *The January lookahead flattered the controller by about 2 points* (0.565 → 0.544 median capture,
+   same sites and tariff). Measured by re-downloading the two replaced dev sites into scratch so the
+   comparison is like-for-like.
+6. *Rejected: re-selecting all 40 sites from 11804 only.* It would have silently reshuffled the 35
+   kept sites and the dev subset. The replacement uses its own seeded draw, and a test asserts the
+   other sites are byte-identical.
