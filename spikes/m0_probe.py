@@ -20,11 +20,12 @@ BASE = (
     "end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/"
 )
 COUNTY = "G2500170"  # Middlesex County, MA
+TS_PREFIX = "timeseries_individual_buildings/by_state/upgrade=0/state=MA"
 FILES = {
     "meta.parquet": f"metadata_and_annual_results/by_state_and_county/full/parquet/"
     f"state=MA/county={COUNTY}/MA_{COUNTY}_baseline.parquet",
-    "ts_100651.parquet": "timeseries_individual_buildings/by_state/upgrade=0/state=MA/100651-0.parquet",
-    "ts_100652.parquet": "timeseries_individual_buildings/by_state/upgrade=0/state=MA/100652-0.parquet",
+    "ts_100651.parquet": f"{TS_PREFIX}/100651-0.parquet",
+    "ts_100652.parquet": f"{TS_PREFIX}/100652-0.parquet",
     "weather.csv": f"weather/amy2018/{COUNTY}_2018.csv",
 }
 PEAK = "out.electricity.total.peak_demand..kw"
