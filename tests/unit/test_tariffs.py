@@ -198,3 +198,31 @@ def test_peak_limit_is_inclusive(record: dict[str, Any]) -> None:
     assert match_tariff(_site(peak_kw=200.0), [tariff]) == tariff
     with pytest.raises(TariffMatchError):
         match_tariff(_site(peak_kw=200.01), [tariff])
+
+
+def test_multi_url_source_is_split_not_glued(record: dict[str, Any]) -> None:
+    """Regression: URDB `source` can hold several URLs separated by blank lines."""
+    record["source"] = "https://a.example/one.pdf\r\n\r\nhttps://b.example/two.pdf"
+    urls = [str(u) for u in parse_urdb_record(record, "x").source_urls]
+    assert urls == ["https://a.example/one.pdf", "https://b.example/two.pdf"]
+
+
+def test_committed_meco_g2_matches_its_published_values() -> None:
+    """Data contract for data/tariffs/meco_g2_sema.json (URDB 67d08dea7568c8189f03c54e)."""
+    from ridgeline.config import REPO_ROOT
+
+    (g2,) = load_tariff_file(REPO_ROOT / "data" / "tariffs" / "meco_g2_sema.json")
+    assert (g2.eiaid, g2.tariff_id) == (11804, "67d08dea7568c8189f03c54e")
+    assert g2.flat_demand_usd_per_kw_by_month == [14.82] * 12
+    assert g2.demand_tou_usd_per_kw is None
+    assert g2.energy_usd_per_kwh.rates == [0.0733]
+    assert g2.fixed_monthly_usd == 45.0
+    assert (g2.min_peak_kw, g2.max_peak_kw) == (None, 200.0)
+    assert (g2.min_monthly_kwh, g2.max_monthly_kwh) == (10_000.0, None)
+    assert str(g2.effective_date) == "2025-02-01"
+    assert [str(u).rsplit("/", 1)[-1] for u in g2.source_urls] == [
+        "meco_delivery.pdf",
+        "meco_basic_service.pdf",
+        "meco_g2.pdf",
+    ]
+    assert not g2.is_test_fixture and not g2.ratchet_ignored

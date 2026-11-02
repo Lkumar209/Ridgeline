@@ -156,7 +156,7 @@ class Tariff(_Frozen):
     utility: str
     eiaid: int | None
     name: str
-    source_url: HttpUrl
+    source_urls: list[HttpUrl] = Field(min_length=1)
     urdb_uri: HttpUrl | None = None
     effective_date: date | None = None
     fixed_monthly_usd: float = Field(ge=0)

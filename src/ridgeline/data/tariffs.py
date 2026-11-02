@@ -64,7 +64,7 @@ def parse_urdb_record(
         utility=str(record["utility"]),
         eiaid=int(record["eiaid"]) if record.get("eiaid") is not None else None,
         name=str(record["name"]),
-        source_url=_source_url(record),
+        source_urls=_source_urls(record),
         urdb_uri=record.get("uri"),
         effective_date=_epoch_to_date(record.get("startdate")),
         fixed_monthly_usd=_fixed_monthly(record),
@@ -136,11 +136,18 @@ def tariff_coverage(sites: list[Site], tariffs: list[Tariff]) -> TariffCoverage:
 # --- helpers ----------------------------------------------------------------------------
 
 
-def _source_url(record: dict[str, Any]) -> str:
+def _source_urls(record: dict[str, Any]) -> list[str]:
+    """Every URL in `source` (URDB often lists several, separated by blank lines), else `uri`.
+
+    Regression: a multi-URL `source` used to be passed whole to HttpUrl, which stripped the
+    whitespace and silently glued the URLs into one invalid link.
+    """
     for key in ("source", "uri"):
         value = record.get(key)
-        if isinstance(value, str) and value.startswith("http"):
-            return value
+        if isinstance(value, str):
+            urls = [token for token in value.split() if token.startswith("http")]
+            if urls:
+                return urls
     raise ValueError("tariff record needs a 'source' or 'uri' URL")
 
 
