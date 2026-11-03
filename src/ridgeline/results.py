@@ -55,10 +55,11 @@ def cached_savings(
     path = _cache_path(settings, savings_fingerprint(settings, site_ids))
     if path.exists() and not force:
         return pd.read_csv(path), True
-    table = compute()
     path.parent.mkdir(parents=True, exist_ok=True)
-    table.to_csv(path, index=False)
-    return table, False
+    compute().to_csv(path, index=False)
+    # Return what a later cache hit would read, so hit and miss give byte-identical results
+    # (pandas' CSV float parser can differ from the in-memory value in the last bit).
+    return pd.read_csv(path), False
 
 
 def _cache_path(settings: Settings, fingerprint: str) -> Path:

@@ -45,3 +45,16 @@ def test_fingerprint_depends_on_which_sites_are_ranked(tmp_path: Path) -> None:
     settings = _settings_in(tmp_path)
     assert savings_fingerprint(settings, ["a", "b"]) != savings_fingerprint(settings, None)
     assert savings_fingerprint(settings, ["b", "a"]) == savings_fingerprint(settings, ["a", "b"])
+
+
+def test_cache_miss_and_hit_return_identical_tables(tmp_path: Path) -> None:
+    """Regression: a fresh simulation and a cache hit differed by ~1e-11 (CSV float parsing)."""
+    settings = _settings_in(tmp_path)
+    value = 0.1 + 0.2  # not exactly representable; exposes any round-trip difference
+
+    def compute() -> pd.DataFrame:
+        return pd.DataFrame({"site_id": ["a"], "x": [value * 12345.678901234]})
+
+    miss, _ = cached_savings(settings, compute)
+    hit, _ = cached_savings(settings, compute)
+    pd.testing.assert_frame_equal(miss, hit, check_exact=True)
