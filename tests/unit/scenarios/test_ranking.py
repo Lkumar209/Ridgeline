@@ -109,3 +109,68 @@ def test_fan_final_year_equals_npv_percentiles() -> None:
     assert (
         (result.fan["p10"] <= result.fan["p50"]) & (result.fan["p50"] <= result.fan["p90"])
     ).all()
+
+
+# --- wording: breakeven label and headline (regression: negative $/kW confused readers) ---
+
+
+def test_breakeven_label_says_never_pays_back_at_or_below_zero() -> None:
+    from ridgeline.ranking.pipeline import NEVER_PAYS_BACK, breakeven_label
+
+    assert NEVER_PAYS_BACK == "never pays back, even at $0 battery cost"
+    assert breakeven_label(-27.0) == NEVER_PAYS_BACK
+    assert breakeven_label(0.0) == NEVER_PAYS_BACK
+    assert breakeven_label(56.14) == "$56/kW"
+
+
+def _ranking(rows: list[tuple[str, int, int, float]]) -> pd.DataFrame:
+    """(site_id, rank, rank_by_p50, breakeven $/kW) -> a minimal ranking table."""
+    return pd.DataFrame(
+        [
+            {
+                "site_id": s,
+                "rank": r,
+                "rank_by_p50": r50,
+                "breakeven_capex_usd_per_kw": b,
+                "npv_p90": -100_000.0,
+                "p_npv_positive": 0.0,
+            }
+            for s, r, r50, b in rows
+        ]
+    )
+
+
+def test_headline_names_the_closest_site_when_it_is_not_the_most_robust() -> None:
+    from ridgeline.ranking.pipeline import headline_sentence
+
+    table = _ranking([("cs-a", 1, 2, -27.0), ("cs-b", 6, 1, 56.0), ("cs-c", 2, 3, -80.0)])
+    text = headline_sentence(table, inputs(), 8000)
+    assert "most robust site (cs-a, ranked 1st by bad-case P10 NPV)" in text
+    assert "closest to breaking even is a different one, cs-b" in text
+    assert "best by median NPV but ranked 6th on robustness" in text
+    assert "about $56/kW" in text
+    assert "the best site" not in text  # the ambiguous phrase is gone
+
+
+def test_headline_when_the_most_robust_site_is_also_closest() -> None:
+    from ridgeline.ranking.pipeline import headline_sentence
+
+    text = headline_sentence(_ranking([("cs-a", 1, 1, 40.0), ("cs-b", 2, 2, 10.0)]), inputs(), 100)
+    assert "In the central case it breaks even only if the battery cost about $40/kW" in text
+    assert "different one" not in text
+
+
+def test_headline_when_no_site_ever_breaks_even() -> None:
+    from ridgeline.ranking.pipeline import headline_sentence
+
+    text = headline_sentence(_ranking([("cs-a", 1, 1, -5.0), ("cs-b", 2, 2, -9.0)]), inputs(), 100)
+    assert "every site never pays back, even at $0 battery cost" in text
+    assert "/kW, versus" not in text
+
+
+def test_revenue_sentence_names_the_site_it_means() -> None:
+    result = rank_sites(five_sites(), inputs(), n_draws=300, seed=2)
+    text = result.explanations["other_revenue"]
+    need = result.ranking.set_index("site_id")["required_other_revenue_usd_per_kw_year"]
+    assert f"the site needing the least ({need.idxmin()}, ranked" in text
+    assert "the best site" not in text

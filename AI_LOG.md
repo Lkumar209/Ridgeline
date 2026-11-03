@@ -257,3 +257,25 @@ it was caught. Newest milestone at the bottom.
    - the regenerated `sites.csv` and `site_locations.csv` were identical to the committed ones;
    - the ranking was byte-identical to the committed `docs/m4/ranking.csv`;
    - the API and page answered.
+
+## Clarity fixes after the user's demo (breakeven wording, "best site", layout)
+
+**Key prompt.** On the user's Mac the demo worked, with three requests:
+- show "never pays back, even at $0 battery cost" instead of a negative $/kW;
+- say which site "the best site" is when it differs from the top-ranked one;
+- tighten the empty space under the map.
+
+The user also asked to confirm "the download-retry PR from my earlier message" was included.
+
+**What was found**
+1. *There is no download-retry PR, and no earlier message about one in this session.* Checked the
+   PR list (#1–#4 only), the remote branches, and `data/cache.py` (no retry logic). I reported that
+   rather than claiming it was included or inventing one.
+2. *Two sentences used "the best site" for a site that is not the top-ranked one:* the headline
+   and the other-revenue sentence. Both meant cs-118913 (best by median NPV, 6th by P10), while
+   the page highlights cs-144167 (1st by P10). I caught the second while searching the docs for the
+   phrase after fixing the first. Both now name the site and its rank. Tests assert that the
+   ambiguous phrase is gone.
+3. *The breakeven wording lives in one Python function* (`breakeven_label`). The API serves the
+   label, so the page and the generated docs can't drift from it. An API test checks every row's
+   label against its number.

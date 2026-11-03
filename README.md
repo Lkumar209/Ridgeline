@@ -14,9 +14,11 @@ buildings it:
 > URL or the label `ASSUMPTION`.
 
 **Current finding:** on demand-charge savings alone, no site pays back at NREL ATB 2026 battery
-costs. The best site breaks even at about $56/kW, and needs about $124/kW-year of other revenue
-(for example demand-response payments, not modeled) to break even. The ranking shows where a
-battery loses least, most reliably. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
+costs (about $1,570/kW). Even a far cheaper battery would only help one site: cs-118913 (best by
+median NPV) breaks even in the central case if the battery cost about $56/kW, and needs about
+$124/kW-year of other revenue (for example demand-response payments, not modeled) at today's
+cost. The other 39 never pay back, even at $0 battery cost. The ranking shows where a battery loses
+least, most reliably. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
 
 ![Map page](docs/m5/map_page.png)
 

@@ -121,3 +121,17 @@ def test_daily_load_uses_local_days() -> None:
     frame = daily_load(weekly_profile_series(year_index()))
     assert len(frame) == 365 and frame["date"].iloc[0] == "2018-01-01"
     assert (frame["peak_kw"] >= frame["mean_kw"]).all()
+
+
+def test_breakeven_label_is_served_and_matches_the_number(client: TestClient) -> None:
+    """Regression: the page showed '-$27/kW'; it must say it never pays back instead."""
+    rows = client.get("/api/rankings").json()["rows"]
+    sites = client.get("/api/sites").json()
+    for item in [*rows, *sites]:
+        value, label = item["breakeven_capex_usd_per_kw"], item["breakeven_label"]
+        if value <= 0:
+            assert label == "never pays back, even at $0 battery cost"
+        else:
+            assert label.endswith("/kW") and not label.startswith("-")
+    detail = client.get(f"/api/sites/{sites[0]['site_id']}").json()
+    assert detail["ranking"]["breakeven_label"] == detail["site"]["breakeven_label"]
