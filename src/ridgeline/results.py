@@ -27,8 +27,9 @@ BATTERY_ASSUMPTIONS = (
 )
 
 
-def savings_fingerprint(settings: Settings) -> str:
+def savings_fingerprint(settings: Settings, site_ids: list[str] | None = None) -> str:
     digest = hashlib.sha256()
+    digest.update(json.dumps(sorted(site_ids) if site_ids is not None else "all").encode())
     digest.update(settings.resolve(settings.paths.sites_file).read_bytes())
     for path in sorted(settings.resolve(settings.paths.tariffs_dir).glob("*.json")):
         digest.update(path.name.encode() + path.read_bytes())
@@ -41,13 +42,17 @@ def savings_fingerprint(settings: Settings) -> str:
 
 
 def cached_savings(
-    settings: Settings, compute: Callable[[], pd.DataFrame], *, force: bool = False
+    settings: Settings,
+    compute: Callable[[], pd.DataFrame],
+    *,
+    force: bool = False,
+    site_ids: list[str] | None = None,
 ) -> tuple[pd.DataFrame, bool]:
     """Savings table from cache when the fingerprint matches, else `compute()` and store it.
 
     Returns (table, was_cached).
     """
-    path = _cache_path(settings, savings_fingerprint(settings))
+    path = _cache_path(settings, savings_fingerprint(settings, site_ids))
     if path.exists() and not force:
         return pd.read_csv(path), True
     table = compute()

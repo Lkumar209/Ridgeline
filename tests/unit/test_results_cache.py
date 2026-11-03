@@ -38,3 +38,10 @@ def test_cache_hit_skips_recompute(tmp_path: Path) -> None:
     assert (cached_first, cached_second) == (False, True)
     assert len(calls) == 1
     pd.testing.assert_frame_equal(first, second)
+
+
+def test_fingerprint_depends_on_which_sites_are_ranked(tmp_path: Path) -> None:
+    """Regression: a dev-subset run must not reuse (or overwrite) the full 40-site savings."""
+    settings = _settings_in(tmp_path)
+    assert savings_fingerprint(settings, ["a", "b"]) != savings_fingerprint(settings, None)
+    assert savings_fingerprint(settings, ["b", "a"]) == savings_fingerprint(settings, ["a", "b"])

@@ -201,13 +201,15 @@ def rank(
     spec = BatterySpec.from_assumptions(assumptions)
 
     def simulate_savings() -> pd.DataFrame:
-        all_sites = read_sites(settings.resolve(settings.paths.sites_file))
-        tariffs = _tariffs_for(settings, all_sites, None)
-        loads = _cached_loads(settings, all_sites)
-        typer.echo(f"simulating {len(all_sites)} sites (cached for later runs)...")
-        return simulate_sites(all_sites, loads, tariffs, spec, with_optimal=False)[1]
+        # Only the sites being ranked, so `fetch-data --dev-subset` + `rank --dev-subset` works.
+        tariffs = _tariffs_for(settings, sites, None)
+        loads = _cached_loads(settings, sites)
+        typer.echo(f"simulating {len(sites)} sites (cached for later runs)...")
+        return simulate_sites(sites, loads, tariffs, spec, with_optimal=False)[1]
 
-    savings, was_cached = cached_savings(settings, simulate_savings, force=resimulate)
+    savings, was_cached = cached_savings(
+        settings, simulate_savings, force=resimulate, site_ids=[s.site_id for s in sites]
+    )
     typer.echo(f"savings: {'cache hit' if was_cached else 'simulated'}")
     economics = site_economics(sites, savings, assumptions)
     inputs = EconomicInputs.from_assumptions(assumptions, spec.power_kw)
