@@ -159,3 +159,57 @@ it was caught. Newest milestone at the bottom.
 6. *Rejected: re-selecting all 40 sites from 11804 only.* It would have silently reshuffled the 35
    kept sites and the dev subset. The replacement uses its own seeded draw, and a test asserts the
    other sites are byte-identical.
+
+## M4 prelude: CI and the M2 refresh
+
+**What was generated**
+- `.github/workflows/check.yml`, which runs `make check` with uv. Verified offline: data/cache moved
+  aside, network proxy pointed at a dead port, `UV_OFFLINE=1`; 130 passed.
+- A rerun of the M2 experiment and figures on the current 40 sites, with every number in
+  `docs/m2_imputation.md`, ADR-007 and LIMITATIONS updated.
+
+**What changed, and what was wrong**
+1. *Two M2 claims didn't survive the new site list.*
+   - "Peers are mixed" no longer holds: peers now win everywhere. ADR-007 now says so, and explains
+     why the default doesn't change.
+   - "Regression improves MAPE" no longer holds: MAPE is 16.1% vs the baseline's 16.0%. The
+     headline was reworded, because the billing-peak error is still about half.
+   Caught by regenerating every table instead of only the summary.
+2. *The hourly-vs-15-min comparison is a trade-off, not a win.* On the new list, 15-min slots
+   reduce bias but slightly widen the median absolute error. The doc now presents both sides. The
+   M2 entry above records the earlier numbers as history (original site list).
+
+## M4: 15-year Monte Carlo and robustness ranking
+
+**Key prompts**
+- Monte Carlo with fixed seeds; P10/P50/P90 NPV, P(NPV>0), robustness score, tornado sensitivity;
+  churn as per-site survival risk; demand charge swept ±30% to test the proxy tariff; one
+  plain-language sentence each for churn and tariff sensitivity; a stated runtime budget.
+
+**What was generated**
+- `scenarios/`, `ranking/`, `results.py`, `ridgeline rank`, `scripts/report_ranking.py` (generated
+  `docs/m4/`), `docs/m4_ranking.md`, ADR-011, and 27 new tests (unit, property, golden, end-to-end).
+- Capex and O&M sourced from NREL ATB 2024 on OEDI (checked the parquet rows), not invented.
+
+**What was wrong or rejected, and how it was caught**
+1. *Churn raised NPV.* My first model stopped O&M when a tenant left. Most sites save less than their
+   O&M, so leaving early *helped*. Caught by the generated sentence printing "lowers … by $-2,718"
+   (a negative drop). Fixed the semantics (savings stop, O&M continues), and added a property test
+   that churn never raises NPV when savings are non-negative.
+2. *A canned sentence contradicted its numbers* ("barely its place … 15 of 40 sites move"). Fixed
+   by choosing every verdict word from the counts, and by fixing the connector logic.
+3. *Rank shifts were partly Monte Carlo noise.* Comparing 2,000 vs 8,000 draws showed P10 moving a
+   median $1,071, about twice the gap between neighboring sites. Caught by a convergence check I ran
+   before writing the doc. Fixes: default 8,000 draws; a second-seed stability run on every
+   `rank`; "moved" counted only above that noise (5+ places).
+4. *Vacuous end-to-end test.* Each one-month fixture block was idle under the causal first-month
+   rule, so all savings were 0. Caught by a guard assertion that some demand savings are positive.
+   Fixed by simulating the two fortnights as one series.
+5. *Wrong test expectation:* I asserted energy savings are negative (losses). Under a TOU fixture,
+   arbitrage makes them positive. The sign is now asserted only under a single energy price.
+6. *An overstated claim in the doc draft:* "perfect foresight is 2–3× higher". The data says a median
+   1.95× (range 1.6–3.6×). Caught by cross-checking every quoted number against the CSVs before
+   committing.
+7. *A silent no-op edit:* a `str.replace` without an assertion left a table header saying "3+" after
+   the threshold became 5. Caught by ruff flagging the now-unused variable. Edits to existing code
+   now assert their match.

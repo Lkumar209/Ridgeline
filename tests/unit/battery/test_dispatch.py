@@ -11,7 +11,7 @@ from ridgeline.battery.dispatch import feasible_threshold, idle_dispatch, thresh
 from ridgeline.battery.model import battery_limits
 from ridgeline.battery.optimal import optimal_dispatch
 from ridgeline.data.schemas import BatterySpec
-from tests.battery_helpers import SPEC, fixture_tariff, office_like_load
+from tests.battery_helpers import SPEC, fixture_tariff, flat_demand_tariff, office_like_load
 
 DT = 0.25
 
@@ -122,3 +122,17 @@ def test_wraparound_is_flagged_as_lookahead() -> None:
     assert monthly.loc["2018-01", "practical_history_is_lookahead"]
     bills = monthly[["practical_bill_usd", "base_bill_usd"]].to_dict(orient="index")
     assert bills["2018-01"]["practical_bill_usd"] < bills["2018-01"]["base_bill_usd"]
+
+
+def test_savings_split_into_demand_and_energy_adds_up() -> None:
+    """M4 scales demand savings separately, so the parts must sum to the total."""
+    from ridgeline.battery.simulate import annual_summary, simulate_site
+
+    summary = annual_summary(simulate_site(_two_months(), fixture_tariff(), SPEC))
+    for name in ("practical", "oracle", "optimal"):
+        parts = summary[f"{name}_demand_savings_usd"] + summary[f"{name}_energy_savings_usd"]
+        assert parts == pytest.approx(summary[f"{name}_savings_usd"])
+    assert summary["practical_demand_savings_usd"] > 0
+    # With one energy price, round-trip losses can only cost money (no arbitrage to offset them).
+    flat = annual_summary(simulate_site(_two_months(), flat_demand_tariff(), SPEC))
+    assert flat["practical_energy_savings_usd"] < 0

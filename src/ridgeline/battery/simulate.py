@@ -22,6 +22,7 @@ flagged. So the bill with a battery is never above the bill without one, by cons
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
@@ -65,12 +66,18 @@ def simulate_site(
         has_history = i > 0 or history == "wraparound"
         previous = values[rows_by_month[i - 1]] if has_history else None
 
-        def bill(net: np.ndarray, rows: np.ndarray = rows) -> float:
+        def bill(net: np.ndarray, rows: np.ndarray = rows) -> Bill:
             full = np.zeros(len(values))
             full[rows] = net
-            return month_bill(full, prices, rows, dt, tariff.fixed_monthly_usd)["total_usd"]
+            parts = month_bill(full, prices, rows, dt, tariff.fixed_monthly_usd)
+            return Bill(
+                total=parts["total_usd"],
+                demand=parts["demand_flat_usd"] + parts["demand_tou_usd"],
+                energy=parts["energy_usd"],
+            )
 
-        base_bill = bill(load)
+        base = bill(load)
+        base_bill = base.total
         if previous is None:
             start_threshold = float("nan")
             practical = idle_dispatch(load, spec)
@@ -84,6 +91,8 @@ def simulate_site(
             "practical_history_is_lookahead": i == 0 and history == "wraparound",
             "base_peak_kw": float(load.max()),
             "base_bill_usd": base_bill,
+            "base_demand_usd": base.demand,
+            "base_energy_usd": base.energy,
         }
         dispatches: dict[str, Dispatch] = {
             "practical": practical,
@@ -92,20 +101,32 @@ def simulate_site(
         if with_optimal:
             dispatches["optimal"] = optimal_dispatch(load, prices, rows, spec, dt)
         for name, dispatch in dispatches.items():
-            record.update(_score(name, dispatch, bill, base_bill))
+            record.update(_score(name, dispatch, bill, base))
         records.append(record)
     return pd.DataFrame(records).set_index("month")
 
 
+@dataclass(frozen=True)
+class Bill:
+    """A month's bill split into the parts M4 scales separately."""
+
+    total: float
+    demand: float
+    energy: float
+
+
 def _score(
-    name: str, dispatch: Dispatch, bill: Callable[[np.ndarray], float], base_bill: float
+    name: str, dispatch: Dispatch, bill: Callable[[np.ndarray], Bill], base: Bill
 ) -> dict[str, object]:
     net = dispatch.net_kw
     cost = bill(net)
-    idle = cost > base_bill + COST_TOL_USD
+    idle = cost.total > base.total + COST_TOL_USD
+    kept = base if idle else cost
     return {
         f"{name}_peak_kw": float(dispatch.load_kw.max() if idle else net.max()),
-        f"{name}_bill_usd": base_bill if idle else cost,
+        f"{name}_bill_usd": kept.total,
+        f"{name}_demand_usd": kept.demand,
+        f"{name}_energy_usd": kept.energy,
         f"{name}_discharged_kwh": 0.0 if idle else float(dispatch.discharge_kw.sum()),
         f"{name}_idle": bool(idle),
     }
@@ -119,6 +140,10 @@ def annual_summary(monthly: pd.DataFrame) -> dict[str, float]:
         column = f"{name}_bill_usd"
         if column in monthly:
             out[f"{name}_savings_usd"] = base - float(monthly[column].sum())
+            for part in ("demand", "energy"):
+                out[f"{name}_{part}_savings_usd"] = float(
+                    monthly[f"base_{part}_usd"].sum() - monthly[f"{name}_{part}_usd"].sum()
+                )
             out[f"{name}_peak_reduction_kw_mean"] = float(
                 (monthly["base_peak_kw"] - monthly[f"{name}_peak_kw"]).mean()
             )

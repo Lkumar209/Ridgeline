@@ -97,6 +97,11 @@ class GapsConfig(_Frozen):
         return self
 
 
+class ScenariosConfig(_Frozen):
+    seed: int
+    n_draws: int = Field(gt=0)
+
+
 class TariffProxy(_Frozen):
     """Apply a real tariff's values beyond its kW eligibility, as a labeled ASSUMPTION (ADR-010)."""
 
@@ -111,6 +116,7 @@ class Settings(_Frozen):
     comstock: ComStockConfig
     site_selection: SiteSelectionConfig
     gaps: GapsConfig
+    scenarios: ScenariosConfig
     tariff_proxies: list[TariffProxy] = Field(default_factory=list)
 
     def resolve(self, path: Path) -> Path:
