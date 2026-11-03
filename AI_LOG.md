@@ -248,12 +248,12 @@ it was caught. Newest milestone at the bottom.
    Switched to stopping the server by its port.
 7. *README draft said the first `make demo` takes ~40 s.* The fresh-clone test measured 96 s for
    fetch plus rank. Corrected to "1–2 minutes".
+8. *The scratch tooling couldn't reach unpkg or OSM.* Rather than vendor Leaflet, the screenshot run
+   routed the pinned CDN URL to a copy from the npm registry. The SRI hashes were computed from that
+   same file.
 9. *Fresh-clone test* (`git clone` of the pushed branch into an empty folder, then `uv sync`,
    `make check`, `make fetch`, `make rank`, `serve`):
    - 175 tests passed;
    - the regenerated `sites.csv` and `site_locations.csv` were identical to the committed ones;
    - the ranking was byte-identical to the committed `docs/m4/ranking.csv`;
    - the API and page answered.
-8. *The scratch tooling couldn't reach unpkg or OSM.* Rather than vendor Leaflet, the screenshot run
-   routed the pinned CDN URL to a copy from the npm registry. The SRI hashes were computed from that
-   same file.
