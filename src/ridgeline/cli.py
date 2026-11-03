@@ -103,11 +103,6 @@ def _power_factor() -> float:
     return float(value)
 
 
-def _not_yet(milestone: str) -> None:
-    typer.echo(f"not implemented until {milestone}", err=True)
-    raise typer.Exit(code=1)
-
-
 @app.command()
 def simulate(
     dev_subset: bool = typer.Option(False, "--dev-subset", help="Only the 10 dev sites."),
@@ -263,6 +258,26 @@ def _cached_loads(settings: Settings, sites: list[Site]) -> dict[str, pd.Series]
 
 
 @app.command()
-def serve() -> None:
-    """Serve the API and map UI (M5)."""
-    _not_yet("M5")
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Interface to bind."),
+    port: int = typer.Option(8000, help="Port."),
+    config: Path | None = typer.Option(None, help="Config file (default: config/default.yaml)."),
+) -> None:
+    """Serve the API and the map page at http://HOST:PORT (reads `ridgeline rank` outputs)."""
+    import uvicorn
+
+    from ridgeline.api.app import create_app
+    from ridgeline.api.data import ApiData, load_api_data
+
+    settings = load_settings(config)
+    loaded: list[ApiData] = []
+
+    def provider() -> ApiData:
+        # Load lazily and keep the first success; a missing-results error is retried next call,
+        # so running `ridgeline rank` while the server is up just works.
+        if not loaded:
+            loaded.append(load_api_data(settings))
+        return loaded[0]
+
+    typer.echo(f"Ridgeline (illustrative) at http://{host}:{port}")
+    uvicorn.run(create_app(provider), host=host, port=port)
