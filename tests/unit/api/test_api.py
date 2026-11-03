@@ -112,6 +112,9 @@ def test_map_page_is_served(client: TestClient) -> None:
     response = client.get("/")
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
+    assert "illustrative" in response.text and "app.js" in response.text
+    for asset in ("/app.js", "/styles.css"):
+        assert client.get(asset).status_code == 200
 
 
 def test_daily_load_uses_local_days() -> None:
