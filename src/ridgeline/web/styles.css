@@ -1,0 +1,85 @@
+/* Tokens: reference palette (validated). Ordinal rank ramp = blue 700 -> 250 (dark = better). */
+:root {
+  color-scheme: light;
+  --surface: #fcfcfb;
+  --panel: #ffffff;
+  --text: #0b0b0b;
+  --text-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --rank-1: #0d366b;
+  --rank-2: #1c5cab;
+  --rank-3: #2a78d6;
+  --rank-4: #5598e7;
+  --rank-5: #86b6ef;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --band: rgba(42, 120, 214, 0.18);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface: #1a1a19;
+    --panel: #222220;
+    --text: #f0efec;
+    --text-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --band: rgba(57, 135, 229, 0.25);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #1a1a19;
+  --panel: #222220;
+  --text: #f0efec;
+  --text-2: #c3c2b7;
+  --grid: #2c2c2a;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --band: rgba(57, 135, 229, 0.25);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--surface);
+  color: var(--text);
+}
+header, .explain, footer { padding: 16px 24px; max-width: 1200px; margin: 0 auto; }
+h1 { margin: 0 0 4px; font-size: 22px; }
+h2 { font-size: 16px; margin: 0 0 8px; }
+h3 { font-size: 14px; margin: 16px 0 4px; color: var(--text-2); font-weight: 600; }
+.tag { font-size: 12px; font-weight: 500; color: var(--text-2); border: 1px solid var(--grid);
+       border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
+.lede { margin: 0; color: var(--text-2); max-width: 900px; }
+main { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; padding: 0 24px;
+       max-width: 1200px; margin: 0 auto; }
+#map { height: 520px; border-radius: 8px; border: 1px solid var(--grid); background: var(--panel); }
+.map-wrap { position: relative; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.note, .hint, footer { color: var(--muted); font-size: 13px; }
+.detail { background: var(--panel); border: 1px solid var(--grid); border-radius: 8px; padding: 16px;
+          min-height: 520px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 8px 0; }
+.stat .k { color: var(--text-2); font-size: 12px; }
+.stat .v { font-size: 16px; font-variant-numeric: tabular-nums; }
+.chart { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--text-2); font-size: 11px; }
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .zero { stroke: var(--text); stroke-width: 1; }
+.readout { font-size: 12px; color: var(--text-2); min-height: 18px; font-variant-numeric: tabular-nums; }
+.explain ul { padding-left: 18px; margin: 0; }
+.explain li { margin-bottom: 6px; color: var(--text-2); }
+.explain b { color: var(--text); }
+@media (max-width: 860px) {
+  main { grid-template-columns: 1fr; padding: 0 16px; }
+  header, .explain, footer { padding: 12px 16px; }
+  #map { height: 380px; }
+  .detail { min-height: 0; }
+}

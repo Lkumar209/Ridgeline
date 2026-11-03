@@ -16,7 +16,9 @@ from ridgeline.assumptions import load_assumptions
 from ridgeline.battery.simulate import History, simulate_sites
 from ridgeline.config import Settings, load_settings
 from ridgeline.data import comstock
+from ridgeline.data.cache import download
 from ridgeline.data.comstock import load_cached_timeseries
+from ridgeline.data.locations import load_geojson, puma_centroids, site_locations
 from ridgeline.data.schemas import BatterySpec, Site, Tariff
 from ridgeline.data.sites import read_sites, write_sites
 from ridgeline.data.tariffs import (
@@ -59,6 +61,13 @@ def fetch_data(
                 comstock.fetch_timeseries(settings.comstock, site.bldg_id, cache_dir, client)
         for county in sorted({s.county_gisjoin for s in targets}):
             comstock.fetch_weather(settings.comstock, county, cache_dir, client)
+        puma_map = cache_dir / "comstock" / "geography" / "pumas_northeast.geojson"
+        download(comstock.puma_map_url(settings.comstock), puma_map, client)
+    puma_by_bldg = dict(zip(meta["bldg_id"].astype(int), meta["puma_gisjoin"], strict=True))
+    centroids = puma_centroids(load_geojson(puma_map))
+    site_locations(sites, puma_by_bldg, centroids).to_csv(
+        settings.resolve(settings.paths.locations_file), index=False
+    )
     _report(settings, sites, targets, cache_dir)
 
 
@@ -92,11 +101,6 @@ def _power_factor() -> float:
     if isinstance(value, str):
         raise ValueError("power_factor_for_kva_demand must be numeric")
     return float(value)
-
-
-def _not_yet(milestone: str) -> None:
-    typer.echo(f"not implemented until {milestone}", err=True)
-    raise typer.Exit(code=1)
 
 
 @app.command()
@@ -197,13 +201,15 @@ def rank(
     spec = BatterySpec.from_assumptions(assumptions)
 
     def simulate_savings() -> pd.DataFrame:
-        all_sites = read_sites(settings.resolve(settings.paths.sites_file))
-        tariffs = _tariffs_for(settings, all_sites, None)
-        loads = _cached_loads(settings, all_sites)
-        typer.echo(f"simulating {len(all_sites)} sites (cached for later runs)...")
-        return simulate_sites(all_sites, loads, tariffs, spec, with_optimal=False)[1]
+        # Only the sites being ranked, so `fetch-data --dev-subset` + `rank --dev-subset` works.
+        tariffs = _tariffs_for(settings, sites, None)
+        loads = _cached_loads(settings, sites)
+        typer.echo(f"simulating {len(sites)} sites (cached for later runs)...")
+        return simulate_sites(sites, loads, tariffs, spec, with_optimal=False)[1]
 
-    savings, was_cached = cached_savings(settings, simulate_savings, force=resimulate)
+    savings, was_cached = cached_savings(
+        settings, simulate_savings, force=resimulate, site_ids=[s.site_id for s in sites]
+    )
     typer.echo(f"savings: {'cache hit' if was_cached else 'simulated'}")
     economics = site_economics(sites, savings, assumptions)
     inputs = EconomicInputs.from_assumptions(assumptions, spec.power_kw)
@@ -215,6 +221,8 @@ def rank(
     out_dir = settings.resolve(settings.paths.cache_dir) / "results"
     result.ranking.to_csv(out_dir / "ranking.csv", index=False)
     result.tornado.to_csv(out_dir / "tornado.csv", index=False)
+    result.revenue_sweep.to_csv(out_dir / "revenue_sweep.csv", index=False)
+    result.fan.to_csv(out_dir / "fan.csv", index=False, float_format="%.2f")
     pd.DataFrame([vars(s) for s in result.shifts]).to_csv(out_dir / "rank_shifts.csv", index=False)
     meta = {"n_draws": n_draws, "seed": settings.scenarios.seed, "seconds": round(elapsed, 2)}
     (out_dir / "explanations.json").write_text(
@@ -231,6 +239,7 @@ def rank(
         "p_npv_positive",
         "rank_by_p50",
         "breakeven_capex_usd_per_kw",
+        "required_other_revenue_usd_per_kw_year",
     ]
     typer.echo(result.ranking[columns].round(0).to_string(index=False))
     for key, sentence in result.explanations.items():
@@ -251,6 +260,26 @@ def _cached_loads(settings: Settings, sites: list[Site]) -> dict[str, pd.Series]
 
 
 @app.command()
-def serve() -> None:
-    """Serve the API and map UI (M5)."""
-    _not_yet("M5")
+def serve(
+    host: str = typer.Option("127.0.0.1", help="Interface to bind."),
+    port: int = typer.Option(8000, help="Port."),
+    config: Path | None = typer.Option(None, help="Config file (default: config/default.yaml)."),
+) -> None:
+    """Serve the API and the map page at http://HOST:PORT (reads `ridgeline rank` outputs)."""
+    import uvicorn
+
+    from ridgeline.api.app import create_app
+    from ridgeline.api.data import ApiData, load_api_data
+
+    settings = load_settings(config)
+    loaded: list[ApiData] = []
+
+    def provider() -> ApiData:
+        # Load lazily and keep the first success; a missing-results error is retried next call,
+        # so running `ridgeline rank` while the server is up just works.
+        if not loaded:
+            loaded.append(load_api_data(settings))
+        return loaded[0]
+
+    typer.echo(f"Ridgeline (illustrative) at http://{host}:{port}")
+    uvicorn.run(create_app(provider), host=host, port=port)

@@ -44,7 +44,7 @@ class Draws:
         return replace(self, **{name: np.full(self.n, value)})
 
 
-def npv(
+def discounted_cashflows(
     demand_savings: np.ndarray,
     energy_savings: np.ndarray,
     is_proxy: np.ndarray,
@@ -53,7 +53,11 @@ def npv(
     noise: np.ndarray,
     power_kw: float,
 ) -> np.ndarray:
-    """NPV per site and draw, shape (S, N). `alive` and `noise` have shape (S, N, T)."""
+    """Discounted cash flow per site, draw and year 0..T, shape (S, N, T+1).
+
+    Year 0 is the upfront cost net of incentive; NPV is the sum over the last axis.
+    `alive` and `noise` have shape (S, N, T).
+    """
     s, n, t_max = alive.shape
     if noise.shape != alive.shape or draws.n != n or len(demand_savings) != s:
         raise ValueError("shape mismatch between sites, draws and years")
@@ -66,4 +70,27 @@ def npv(
     om = (draws.om_usd_per_kw_year * power_kw)[None, :, None]
     discount = (1 + draws.discount_rate)[None, :, None] ** (-years)
     capex = draws.capex_usd_per_kw * power_kw * (1 - draws.incentive)
-    return np.asarray(-capex[None, :] + np.sum((alive * savings - om) * discount, axis=2))
+    upfront = np.broadcast_to(-capex[None, :, None], (s, n, 1))
+    return np.concatenate([upfront, (alive * savings - om) * discount], axis=2)
+
+
+def npv(
+    demand_savings: np.ndarray,
+    energy_savings: np.ndarray,
+    is_proxy: np.ndarray,
+    draws: Draws,
+    alive: np.ndarray,
+    noise: np.ndarray,
+    power_kw: float,
+) -> np.ndarray:
+    """NPV per site and draw, shape (S, N): the sum of `discounted_cashflows` over years."""
+    flows = discounted_cashflows(
+        demand_savings, energy_savings, is_proxy, draws, alive, noise, power_kw
+    )
+    return np.asarray(flows.sum(axis=2))
+
+
+def annuity_factor(discount_rate: np.ndarray, years: int) -> np.ndarray:
+    """Present value of $1 a year for `years` years, per draw: sum_t (1 + r)^-t. Shape (N,)."""
+    t = np.arange(1, years + 1)[None, :]
+    return np.asarray(np.sum((1 + discount_rate)[:, None] ** (-t), axis=1))

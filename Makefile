@@ -1,4 +1,4 @@
-.PHONY: install check lint fmt typecheck test fetch fetch-dev
+.PHONY: install check lint fmt typecheck test fetch fetch-dev rank serve demo
 
 install:
 	uv sync
@@ -24,3 +24,12 @@ fetch:
 
 fetch-dev:
 	uv run ridgeline fetch-data --dev-subset
+
+rank:
+	uv run ridgeline rank
+
+serve:
+	uv run ridgeline serve
+
+# Fresh clone to a running map: download data (~30 MB), simulate and rank, then serve.
+demo: fetch rank serve

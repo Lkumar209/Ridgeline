@@ -48,6 +48,7 @@ def test_rank_sites_gives_every_explanation() -> None:
     result = rank_sites(five_sites(), inputs(), n_draws=300, seed=11)
     assert set(result.explanations) == {
         "headline",
+        "other_revenue",
         "closeness",
         "rank_stability",
         "proxy_tariff",
@@ -63,3 +64,48 @@ def test_rank_sites_gives_every_explanation() -> None:
 def test_usd_formatting() -> None:
     assert usd(-130785.2) == "-$130,785"
     assert usd(56.4) == "$56"
+
+
+def test_required_other_revenue_closes_the_central_gap() -> None:
+    """Adding exactly the required revenue makes the central-case NPV zero (or keeps it >= 0)."""
+    from ridgeline.ranking.pipeline import required_other_revenue
+    from ridgeline.scenarios.cashflow import annuity_factor
+    from ridgeline.scenarios.montecarlo import central_draws, expected_npv
+
+    sites, i = five_sites(), inputs()
+    need = required_other_revenue(sites, i)["required_other_revenue_usd_per_kw_year"].to_numpy()
+    center = central_draws(i)
+    npv = expected_npv(sites, i, center)[:, 0]
+    factor = annuity_factor(center.discount_rate, i.life_years)[0]
+    np.testing.assert_allclose(np.minimum(npv, 0) + need * i.power_kw * factor, 0, atol=1e-6)
+    assert (need >= 0).all()
+
+
+def test_revenue_sweep_is_monotone() -> None:
+    result = rank_sites(five_sites(), inputs(), n_draws=300, seed=4)
+    sweep = result.revenue_sweep
+    assert sweep["sites_likely_viable"].is_monotonic_increasing
+    assert sweep["sites_robustly_viable"].is_monotonic_increasing
+    assert (sweep["sites_robustly_viable"] <= sweep["sites_likely_viable"]).all()
+
+
+def test_annuity_factor_matches_closed_form() -> None:
+    from ridgeline.scenarios.cashflow import annuity_factor
+
+    r = np.array([0.05])
+    expected = (1 - 1.05**-15) / 0.05
+    assert annuity_factor(r, 15)[0] == pytest.approx(expected)
+
+
+def test_fan_final_year_equals_npv_percentiles() -> None:
+    """The fan chart and the ranking come from the same draws and the same cash-flow formula."""
+    result = rank_sites(five_sites(), inputs(), n_draws=500, seed=9)
+    last = result.fan[result.fan["year"] == result.fan["year"].max()].set_index("site_id")
+    table = result.ranking.set_index("site_id")
+    for col, pct in (("p10", "npv_p10"), ("p50", "npv_p50"), ("p90", "npv_p90")):
+        np.testing.assert_allclose(last[col], table.loc[last.index, pct], rtol=1e-9)
+    first = result.fan[result.fan["year"] == 0]
+    assert (first["p50"] < 0).all()  # year 0 is the upfront cost
+    assert (
+        (result.fan["p10"] <= result.fan["p50"]) & (result.fan["p50"] <= result.fan["p90"])
+    ).all()

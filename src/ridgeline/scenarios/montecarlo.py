@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from ridgeline.scenarios.cashflow import Draws, npv
+from ridgeline.scenarios.cashflow import Draws, discounted_cashflows, npv
 from ridgeline.scenarios.inputs import EconomicInputs, SiteEconomics
 
 
@@ -92,6 +92,26 @@ def run_monte_carlo(
     )
     alive = alive_from_uniform(randomness.churn_uniform, hazard, years)
     return npv(*_site_arrays(sites), draws, alive, randomness.noise, inputs.power_kw)
+
+
+def cashflow_fan(
+    sites: list[SiteEconomics],
+    inputs: EconomicInputs,
+    draws: Draws,
+    randomness: SiteRandomness,
+) -> np.ndarray:
+    """P10/P50/P90 of cumulative discounted cash flow by year, shape (S, 3, T+1).
+
+    Same draws and churn as `run_monte_carlo`, so the last year equals the NPV percentiles.
+    """
+    years = inputs.life_years
+    hazard = np.array([s.churn_hazard for s in sites])[:, None] * draws.churn_multiplier[None, :]
+    alive = alive_from_uniform(randomness.churn_uniform, hazard, years)
+    flows = discounted_cashflows(
+        *_site_arrays(sites), draws, alive, randomness.noise, inputs.power_kw
+    )
+    cumulative = np.cumsum(flows, axis=2)
+    return np.asarray(np.percentile(cumulative, [10, 50, 90], axis=1).transpose(1, 0, 2))
 
 
 def expected_npv(sites: list[SiteEconomics], inputs: EconomicInputs, draws: Draws) -> np.ndarray:

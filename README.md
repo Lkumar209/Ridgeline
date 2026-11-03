@@ -1,21 +1,24 @@
 # Ridgeline
 
-Ranks Massachusetts commercial sites for behind-the-meter battery peak shaving. Sites are ranked
-by **robustness under uncertainty**, not by expected value alone. For each site, Ridgeline
-simulates a battery (default 125 kW / 250 kWh) against the building's 15-minute load and a
-demand-charge tariff, then runs a 15-year Monte Carlo cash-flow model.
+Ranks Massachusetts commercial sites for behind-the-meter battery peak shaving, by
+**robustness under uncertainty**, not by expected value alone. For each of 40 real NREL ComStock
+buildings it:
+1. simulates a 125 kW / 250 kWh battery against the building's 15-minute load and a real
+   demand-charge tariff (MECo G-2);
+2. runs a 15-year Monte Carlo cash-flow model;
+3. ranks sites by their bad-case (P10) NPV, with breakeven battery cost alongside;
+4. explains in plain sentences what moves the ranking.
 
-> **All outputs are illustrative.** This is a personal project inspired by a real problem. It is
-> not anyone's production model. Every assumption is listed in `assumptions.yaml` with a source
+> **All outputs are illustrative.** This is a personal project inspired by a real problem, not
+> anyone's production model. Every number about the world is in `assumptions.yaml` with a source
 > URL or the label `ASSUMPTION`.
 
-**Status:** M4.
-- **Done so far:** data layer, meter-gap imputation (`docs/m2_imputation.md`), battery dispatch and
-  billing on the real MECo G-2 tariff (`docs/m3_dispatch.md`), and a 15-year Monte Carlo robustness
-  ranking with sensitivity (`docs/m4_ranking.md`).
-- **Still to come:** API and map (M5), then the agent layer (M6).
-- **Current finding:** at 2026 ATB battery costs, no site pays back on demand-charge savings alone;
-  the ranking shows where a battery loses least, most reliably.
+**Current finding:** on demand-charge savings alone, no site pays back at NREL ATB 2026 battery
+costs. The best site breaks even at about $56/kW, and needs about $124/kW-year of other revenue
+(for example demand-response payments, not modeled) to break even. The ranking shows where a
+battery loses least, most reliably. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
+
+![Map page](docs/m5/map_page.png)
 
 ## Quickstart
 
@@ -23,40 +26,70 @@ Requires [uv](https://docs.astral.sh/uv/). Python 3.11 is installed by uv.
 
 ```bash
 git clone https://github.com/Lkumar209/Ridgeline.git && cd Ridgeline
-uv sync                          # install dependencies
-make check                       # ruff + mypy --strict + pytest (offline)
-uv run ridgeline fetch-data      # select 40 sites, cache ~30 MB under data/cache/
-uv run ridgeline rank            # simulate (~35 s, cached), Monte Carlo, ranking (~3 s)
 ```
 
-`make check` needs no network, API keys or downloaded data: tests run on small committed fixtures.
-GitHub Actions runs the same `make check` on every push and pull request (`.github/workflows/check.yml`).
+```bash
+uv sync
+```
 
-Use `uv run ridgeline fetch-data --dev-subset` to fetch only the 10-site development subset
-(about 10 s).
+```bash
+make demo
+```
+
+`make demo` downloads ~30 MB of ComStock data, simulates and ranks the 40 sites (1–2 minutes
+the first time), then serves the map at http://127.0.0.1:8000. The page loads Leaflet and OpenStreetMap tiles
+from the internet.
+
+Tests and checks need no network, API keys or downloaded data:
+
+```bash
+make check
+```
+
+GitHub Actions runs the same `make check` on every push and pull request.
+
+## Commands
+
+| Command | What it does |
+|---|---|
+| `uv run ridgeline fetch-data [--dev-subset]` | Select sites from ComStock metadata, cache loads, weather and the PUMA map; write `data/sites.csv` and `data/site_locations.csv` |
+| `uv run ridgeline simulate [--dev-subset] [--tariff-override FILE]` | Dispatch and monthly bills for each site: practical controller, oracle threshold, perfect-foresight LP |
+| `uv run ridgeline rank [--dev-subset] [--draws N] [--resimulate]` | 15-year Monte Carlo, robustness ranking, sensitivity, plain-language explanations |
+| `uv run ridgeline serve` | FastAPI on http://127.0.0.1:8000: `/api/sites`, `/api/rankings`, `/api/sites/{id}`, and the map page |
+| `uv run python scripts/report_ranking.py` | Regenerate `docs/m4/` from the latest `rank` run |
 
 ## Repo map
 
 | Path | What |
 |---|---|
-| `src/ridgeline/data/` | Loaders and boundary schemas: ComStock loads, weather, tariffs, sites |
-| `src/ridgeline/gaps/` | Meter-outage simulation and imputation (M2); results in `docs/m2_imputation.md` |
+| `src/ridgeline/data/` | Boundary schemas and loaders: ComStock, weather, tariffs (URDB JSON), sites, locations |
+| `src/ridgeline/gaps/` | Meter-outage simulation and imputation (M2) |
 | `src/ridgeline/battery/` | Battery model, threshold controller, LP upper bound, bill calculator (M3) |
 | `src/ridgeline/scenarios/` | 15-year cash flow and Monte Carlo (M4) |
-| `src/ridgeline/ranking/` | Robustness ranking, tornado, scenario comparisons, plain-language sentences (M4) |
+| `src/ridgeline/ranking/` | P10 ranking, breakeven, tornado, scenario sweeps, plain-language sentences (M4) |
+| `src/ridgeline/api/`, `src/ridgeline/web/` | FastAPI app and the single Leaflet page (M5) |
 | `src/ridgeline/results.py` | Fingerprinted cache of simulated savings |
-| `src/ridgeline/config.py` | Run settings from `config/default.yaml` |
-| `src/ridgeline/assumptions.py` | Loads `assumptions.yaml`; rejects unsourced numbers |
-| `src/ridgeline/cli.py` | `fetch-data`, `simulate`, `rank`, plus a stub for `serve` |
-| `data/sites.csv` | The 40 selected sites (committed, regenerated by `fetch-data`) |
-| `data/tariffs/` | URDB-format tariff JSON files (see its README) |
-| `data/fixtures/` | Small real-data samples so tests run offline |
-| `data/cache/` | Downloaded data (gitignored) |
-| `tests/` | `unit/`, `property/` (hypothesis), `golden/` (ranking), `e2e/` (fixture to ranking) |
-| `scripts/` | Fixture builder, M2 experiment and plots, M4 report generator |
-| `docs/` | Milestone write-ups and figures |
-| `spikes/` | The M0 data-feasibility report and probe script |
-| `DECISIONS.md`, `LIMITATIONS.md`, `AI_LOG.md` | Why things are the way they are, what is not modeled, and how AI output was checked |
+| `src/ridgeline/cli.py`, `config.py`, `assumptions.py` | CLI, run settings, sourced assumptions |
+| `config/default.yaml`, `assumptions.yaml` | How to run; facts and ranges about the world |
+| `data/sites.csv`, `data/site_locations.csv`, `data/tariffs/` | Committed site list, approximate locations, tariff files |
+| `data/fixtures/`, `tests/fixtures/` | Small real-data and fake-tariff fixtures for offline tests |
+| `tests/` | `unit/`, `property/` (hypothesis), `golden/`, `e2e/` |
+| `docs/` | Architecture and the milestone write-ups (M2–M5), with figures and generated results |
+| `scripts/`, `spikes/` | Fixture builder, experiment and report scripts; the M0 data spike |
 
-Future milestones: `api/` and `web/`
-(M5), `agent/` (M6). `ONBOARDING.md` arrives in M7.
+## Documentation
+
+- [`ONBOARDING.md`](ONBOARDING.md): the problem, the pipeline, each module, how to run, test and
+  debug, what is most likely to break, and three starter features.
+- [`docs/architecture.md`](docs/architecture.md): data-flow and module diagrams, plus contracts.
+- [`DECISIONS.md`](DECISIONS.md): ADRs for key choices and rejected alternatives.
+- [`LIMITATIONS.md`](LIMITATIONS.md): what is simplified or not modeled.
+- [`AI_LOG.md`](AI_LOG.md): what AI generated each milestone, and what was wrong and how it was caught.
+- Write-ups:
+  - [M2 imputation](docs/m2_imputation.md)
+  - [M3 dispatch and billing](docs/m3_dispatch.md)
+  - [M4 ranking](docs/m4_ranking.md) (generated numbers in [`docs/m4/results.md`](docs/m4/results.md))
+
+## Status
+
+M0–M5 and M7 are done. M6 (the LLM agent layer) is not built.

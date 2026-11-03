@@ -65,13 +65,25 @@ list grows each milestone.
 - **Year-to-year load variation is synthetic noise** (10% lognormal), because there is one weather year.
 - **Churn ends savings permanently, with no re-tenanting and no battery resale.** Hazards by building
   type are relative guesses.
-- **One generic upfront incentive fraction (0–30%)** stands in for real programs (tax credits,
-  state programs), whose terms and eligibility are not modeled.
+- **One generic upfront incentive fraction (0–30%)** stands in for capex-reducing incentives (for
+  example a storage tax credit), whose terms and eligibility are not modeled.
+- **No recurring program revenue.** Demand-response payments (for example ConnectedSolutions) are
+  left out. The model reports the revenue each site would need instead of assuming an amount, so
+  "not viable" means "not viable on bill savings alone".
 - **Costs mix sources:** ATB 2022$ costs are converted to 2025$ with an assumed ×1.10 factor; the
   tariff is 2025.
 - **Rank positions within about 4 places are ties** (Monte Carlo noise between seeds).
 - **Imputation error is not propagated.** The current sites have no real gaps; real meter data would
   need the M2 error distribution added.
+
+## API and map (M5)
+- **Map pins are approximate.** Each pin is placed at its PUMA centroid plus an offset of about 1 km;
+  ComStock has no addresses.
+- **Rank colors use 5 groups of 8,** because ranks within about 4 places are ties.
+- **The API serves the last `ridgeline rank` run.** It does not recompute, and after a new run it
+  needs a restart.
+- **The page needs the internet** for the Leaflet library and OpenStreetMap tiles. Tests don't.
+- **No auth, no database, local use only.**
 
 ## MECo G-2 tariff (`data/tariffs/meco_g2_sema.json`)
 - **Delivery service only.** The record's `servicetype` is Delivery. Supply (basic service) energy
