@@ -26,6 +26,7 @@ from ridgeline.ranking.sensitivity import (
 from ridgeline.scenarios.cashflow import Draws, annuity_factor
 from ridgeline.scenarios.inputs import EconomicInputs, SiteEconomics, churn_hazard
 from ridgeline.scenarios.montecarlo import (
+    cashflow_fan,
     central_draws,
     expected_npv,
     run_monte_carlo,
@@ -41,6 +42,7 @@ class RankingResult:
     ranking: pd.DataFrame
     tornado: pd.DataFrame
     revenue_sweep: pd.DataFrame
+    fan: pd.DataFrame  # site_id, year, p10, p50, p90 of cumulative discounted cash flow
     shifts: list[RankShift] = field(default_factory=list)
     explanations: dict[str, str] = field(default_factory=dict)
 
@@ -75,6 +77,7 @@ def rank_sites(
         return summarize_npv(npv, group)
 
     base_npv = run_monte_carlo(sites, inputs, draws, randomness)
+    fan = _fan_table(sites, cashflow_fan(sites, inputs, draws, randomness))
     base = summarize_npv(base_npv, sites)
     sweep = revenue_sweep(base_npv, draws, inputs)
     base_rank = _ranks(base)
@@ -131,7 +134,16 @@ def rank_sites(
         "all_demand": _all_demand_sentence(shifts[2:4]),
         "tenant_churn": churn_sentence(base, no_churn, churn_shift),
     }
-    return RankingResult(base, tornado(sites, inputs, threshold), sweep, shifts, explanations)
+    return RankingResult(base, tornado(sites, inputs, threshold), sweep, fan, shifts, explanations)
+
+
+def _fan_table(sites: list[SiteEconomics], fan: np.ndarray) -> pd.DataFrame:
+    years = np.arange(fan.shape[2])
+    frames = [
+        pd.DataFrame({"site_id": s.site_id, "year": years, "p10": f[0], "p50": f[1], "p90": f[2]})
+        for s, f in zip(sites, fan, strict=True)
+    ]
+    return pd.concat(frames, ignore_index=True)
 
 
 def _seed_stability(

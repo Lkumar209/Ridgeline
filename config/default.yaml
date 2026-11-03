@@ -5,6 +5,8 @@ paths:
   cache_dir: data/cache
   tariffs_dir: data/tariffs
   sites_file: data/sites.csv
+  locations_file: data/site_locations.csv
+  results_dir: data/cache/results
 
 comstock:
   base_url: "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2024/comstock_amy2018_release_2/"

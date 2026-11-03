@@ -25,6 +25,8 @@ class PathsConfig(_Frozen):
     cache_dir: Path
     tariffs_dir: Path
     sites_file: Path
+    locations_file: Path
+    results_dir: Path
 
 
 class ComStockConfig(_Frozen):

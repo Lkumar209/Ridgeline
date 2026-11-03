@@ -16,7 +16,9 @@ from ridgeline.assumptions import load_assumptions
 from ridgeline.battery.simulate import History, simulate_sites
 from ridgeline.config import Settings, load_settings
 from ridgeline.data import comstock
+from ridgeline.data.cache import download
 from ridgeline.data.comstock import load_cached_timeseries
+from ridgeline.data.locations import load_geojson, puma_centroids, site_locations
 from ridgeline.data.schemas import BatterySpec, Site, Tariff
 from ridgeline.data.sites import read_sites, write_sites
 from ridgeline.data.tariffs import (
@@ -59,6 +61,13 @@ def fetch_data(
                 comstock.fetch_timeseries(settings.comstock, site.bldg_id, cache_dir, client)
         for county in sorted({s.county_gisjoin for s in targets}):
             comstock.fetch_weather(settings.comstock, county, cache_dir, client)
+        puma_map = cache_dir / "comstock" / "geography" / "pumas_northeast.geojson"
+        download(comstock.puma_map_url(settings.comstock), puma_map, client)
+    puma_by_bldg = dict(zip(meta["bldg_id"].astype(int), meta["puma_gisjoin"], strict=True))
+    centroids = puma_centroids(load_geojson(puma_map))
+    site_locations(sites, puma_by_bldg, centroids).to_csv(
+        settings.resolve(settings.paths.locations_file), index=False
+    )
     _report(settings, sites, targets, cache_dir)
 
 
@@ -216,6 +225,7 @@ def rank(
     result.ranking.to_csv(out_dir / "ranking.csv", index=False)
     result.tornado.to_csv(out_dir / "tornado.csv", index=False)
     result.revenue_sweep.to_csv(out_dir / "revenue_sweep.csv", index=False)
+    result.fan.to_csv(out_dir / "fan.csv", index=False, float_format="%.2f")
     pd.DataFrame([vars(s) for s in result.shifts]).to_csv(out_dir / "rank_shifts.csv", index=False)
     meta = {"n_draws": n_draws, "seed": settings.scenarios.seed, "seconds": round(elapsed, 2)}
     (out_dir / "explanations.json").write_text(

@@ -7,7 +7,7 @@ Pure functions (`slim_metadata`, `select_sites`, `normalize_timeseries`) are sep
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from datetime import timedelta
 from pathlib import Path
 
@@ -38,6 +38,7 @@ METADATA_COLUMNS = {
     "in.nhgis_county_gisjoin": "county_gisjoin",
     "in.county_name": "county_name",
     "in.nhgis_tract_gisjoin": "tract_gisjoin",
+    "in.nhgis_puma_gisjoin": "puma_gisjoin",
     "in.as_simulated_state_name": "as_simulated_state",
     "in.sqft..ft2": "sqft",
     "out.utility_bills.electricity_utility_eia_id": "utility_eiaid",
@@ -61,6 +62,11 @@ def timeseries_url(cfg: ComStockConfig, bldg_id: int) -> str:
         f"{cfg.base_url}timeseries_individual_buildings/by_state/upgrade={cfg.upgrade}/"
         f"state={cfg.state}/{bldg_id}-{cfg.upgrade}.parquet"
     )
+
+
+def puma_map_url(cfg: ComStockConfig) -> str:
+    """PUMA boundaries for the Northeast census region (GeoJSON, lon/lat)."""
+    return f"{cfg.base_url}geographic_information/map_of_pumas_in_census_region_1_northeast.geojson"
 
 
 def weather_url(cfg: ComStockConfig, county: str) -> str:
@@ -244,7 +250,8 @@ def fetch_metadata(cfg: ComStockConfig, cache_dir: Path, client: httpx.Client) -
     frames = []
     for county in cfg.counties:
         slim_path = cache_dir / "comstock" / "metadata" / f"{county}.parquet"
-        if not slim_path.exists():
+        stale = slim_path.exists() and not _has_columns(slim_path, METADATA_COLUMNS.values())
+        if not slim_path.exists() or stale:
             raw_path = slim_path.with_suffix(".raw.parquet")
             download(metadata_url(cfg, county), raw_path, client)
             columns = list(METADATA_COLUMNS)
@@ -278,3 +285,9 @@ def fetch_weather(cfg: ComStockConfig, county: str, cache_dir: Path, client: htt
     return download(
         weather_url(cfg, county), cache_dir / "comstock" / "weather" / f"{county}.csv", client
     )
+
+
+def _has_columns(path: Path, columns: Iterable[str]) -> bool:
+    """Whether a cached slim file has every column the current code expects (else re-fetch)."""
+    present = set(pd.read_parquet(path).columns)
+    return all(c in present for c in columns)

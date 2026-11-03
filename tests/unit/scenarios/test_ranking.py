@@ -95,3 +95,17 @@ def test_annuity_factor_matches_closed_form() -> None:
     r = np.array([0.05])
     expected = (1 - 1.05**-15) / 0.05
     assert annuity_factor(r, 15)[0] == pytest.approx(expected)
+
+
+def test_fan_final_year_equals_npv_percentiles() -> None:
+    """The fan chart and the ranking come from the same draws and the same cash-flow formula."""
+    result = rank_sites(five_sites(), inputs(), n_draws=500, seed=9)
+    last = result.fan[result.fan["year"] == result.fan["year"].max()].set_index("site_id")
+    table = result.ranking.set_index("site_id")
+    for col, pct in (("p10", "npv_p10"), ("p50", "npv_p50"), ("p90", "npv_p90")):
+        np.testing.assert_allclose(last[col], table.loc[last.index, pct], rtol=1e-9)
+    first = result.fan[result.fan["year"] == 0]
+    assert (first["p50"] < 0).all()  # year 0 is the upfront cost
+    assert (
+        (result.fan["p10"] <= result.fan["p50"]) & (result.fan["p50"] <= result.fan["p90"])
+    ).all()

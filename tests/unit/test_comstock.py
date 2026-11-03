@@ -39,6 +39,7 @@ def _raw_meta_rows() -> pd.DataFrame:
     base = {
         "in.comstock_building_type": "MediumOffice",
         "in.nhgis_county_gisjoin": "G2500170",
+        "in.nhgis_puma_gisjoin": "G25000503",
         "in.county_name": "MA, Middlesex County",
         "in.sqft..ft2": 50000.0,
         "out.utility_bills.electricity_utility_eia_id": "11804",
