@@ -36,7 +36,7 @@ uv sync
 make demo
 ```
 
-`make demo` downloads ~30 MB of ComStock data, simulates and ranks the 40 sites (about a minute
+`make demo` downloads ~30 MB of ComStock data, simulates and ranks the 40 sites (1–2 minutes
 the first time), then serves the map at http://127.0.0.1:8000. The page loads Leaflet and OpenStreetMap tiles
 from the internet.
 
