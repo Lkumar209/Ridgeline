@@ -5,22 +5,39 @@ All numbers come from `docs/m4/results.md`, which is generated from `ridgeline r
 
 ## The answer, in plain language
 
-- **No site is a good battery investment on demand-charge savings alone.**
+- **No site is viable on demand-charge savings alone.** Real projects usually stack other revenue
+  (for example demand-response program payments), which this model leaves out on purpose; see
+  "Incentives and other revenue" below.
   - At NREL ATB 2026 costs for a 2-hour commercial battery (central $1,570/kW in 2025$, about
-    $196k for 125 kW), with MECo G-2 delivery rates and the practical controller, only 1 of 40 sites
-    has a positive NPV in even one of 8,000 simulated futures.
-  - The best site in the central case would break even only if the battery cost about **$56/kW**.
-  - The other 39 lose money **even if the battery were free**: their yearly bill savings are
-    smaller than the ~$4.7k/yr fixed O&M.
-- **So the ranking answers "where would a battery hurt least, most reliably"**, not "where does it
-  pay". That is still the right input to a decision about incentives, cheaper hardware, or a better
-  controller.
+    $196k for 125 kW), with MECo G-2 delivery rates and the practical controller, only 1 of 40
+    sites has a positive NPV in even one of 8,000 simulated futures.
+  - **Breakeven battery cost is the clearest number:** the best site breaks even in the central
+    case only at about **$56/kW**. The other 39 lose money even if the battery were free, because
+    their yearly bill savings are smaller than the ~$4.7k/yr fixed O&M.
+- **How much other revenue would it take?** About **$124/kW-year** for the best site and $147 for
+  the median site, on top of bill savings, to break even in the central case. At $200/kW-year,
+  31 of 40 sites clear the robustness bar (P10 NPV above zero). Whether any program pays that much
+  is not assessed here.
+- **So the ranking answers "where would a battery hurt least, most reliably"** on bill savings alone.
+  That is still the right input to a decision about incentives, cheaper hardware, stacked revenue,
+  or a better controller.
 - **Tariff sensitivity, what it means:** even if our stand-in price for the 23 large buildings is off
   by 30%, most of the same sites stay near the top (7–8 of the top 10). The middle of the list
   reshuffles, though, so trust the top group, not exact positions.
 - **Tenant churn, what it means:** buildings whose tenants come and go (strip malls, restaurants) are
   riskier homes for a battery than schools and clinics. That risk reorders the list more than
   anything else we tested.
+
+## Incentives and other revenue: what is and is not included
+
+| Item | In the model? | How |
+|---|---|---|
+| Upfront, capex-reducing incentives (for example a federal investment tax credit for storage, if a project qualifies) | Yes, as one generic input | `upfront_incentive_fraction`: 0–30% of capex, central 15%, ASSUMPTION. No program's eligibility or rate is asserted. |
+| Recurring performance payments (for example Mass Save ConnectedSolutions demand-response payments) | **No** | Reported instead as the **other revenue each site would need** to break even (`required_other_revenue_usd_per_kw_year`), and a viability table over a sweep of revenue levels ($0–200/kW-year). No amount is guessed. |
+| Wholesale market, capacity or export revenue | No | Out of scope (LIMITATIONS.md). |
+
+The other-revenue figures assume the revenue is earned every year of the 15-year life, whether or
+not the tenant stays. They use the central discount rate (the sweep uses each draw's own rate).
 
 ## Method
 
@@ -40,7 +57,9 @@ All numbers come from `docs/m4/results.md`, which is generated from `ridgeline r
 4. **Ranking** (`ranking/metrics.py`):
    - **Robustness score = P10 NPV**: "in 9 of 10 futures the site does at least this well".
    - Ranked by that score, with P50 shown alongside for contrast.
-   - P(NPV>0) and breakeven capex are added for context.
+   - **Breakeven capex ($/kW)** is the main companion metric, since almost every NPV is negative.
+     The ranking orders sites almost the same way (Spearman 0.94).
+   - Also reported: P(NPV>0) and the other revenue needed to break even.
 5. **Sensitivity** (`ranking/sensitivity.py`):
    - **Tornado:** one input at a time to its low and high end.
    - **Proxy demand charge:** pinned at 0.7 and 1.3 for the 23 proxy sites, with an all-sites

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import numpy as np
 import pandas as pd
 
 from ridgeline.assumptions import Assumption
@@ -22,7 +23,7 @@ from ridgeline.ranking.sensitivity import (
     tornado,
     verdict,
 )
-from ridgeline.scenarios.cashflow import Draws
+from ridgeline.scenarios.cashflow import Draws, annuity_factor
 from ridgeline.scenarios.inputs import EconomicInputs, SiteEconomics, churn_hazard
 from ridgeline.scenarios.montecarlo import (
     central_draws,
@@ -39,6 +40,7 @@ PROXY_SWEEP = (0.7, 1.3)
 class RankingResult:
     ranking: pd.DataFrame
     tornado: pd.DataFrame
+    revenue_sweep: pd.DataFrame
     shifts: list[RankShift] = field(default_factory=list)
     explanations: dict[str, str] = field(default_factory=dict)
 
@@ -72,7 +74,9 @@ def rank_sites(
         npv = run_monte_carlo(group, inputs, d, randomness, churn=churn)
         return summarize_npv(npv, group)
 
-    base = run(sites)
+    base_npv = run_monte_carlo(sites, inputs, draws, randomness)
+    base = summarize_npv(base_npv, sites)
+    sweep = revenue_sweep(base_npv, draws, inputs)
     base_rank = _ranks(base)
     # Positions within the seed-to-seed noise are ties, so only bigger moves count as "moved".
     stability = _seed_stability(sites, inputs, n_draws, seed, base_rank)
@@ -105,10 +109,13 @@ def rank_sites(
     )
     shifts.append(churn_shift)
     shifts.append(stability)
-    base = base.merge(breakeven_capex(sites, inputs), on="site_id")
+    base = base.merge(breakeven_capex(sites, inputs), on="site_id").merge(
+        required_other_revenue(sites, inputs), on="site_id"
+    )
     gap = neighbour_gap(base)
     explanations = {
         "headline": _headline(base, inputs, n_draws),
+        "other_revenue": _revenue_sentence(base, sweep),
         "closeness": (
             f"The sites are close together: neighbours in the ranking differ by a median "
             f"${gap:,.0f} of bad-case value, so small input changes can swap neighbours "
@@ -124,7 +131,7 @@ def rank_sites(
         "all_demand": _all_demand_sentence(shifts[2:4]),
         "tenant_churn": churn_sentence(base, no_churn, churn_shift),
     }
-    return RankingResult(base, tornado(sites, inputs, threshold), shifts, explanations)
+    return RankingResult(base, tornado(sites, inputs, threshold), sweep, shifts, explanations)
 
 
 def _seed_stability(
@@ -194,17 +201,90 @@ def _headline(ranking: pd.DataFrame, inputs: EconomicInputs, n_draws: int) -> st
     any_positive = ranking[ranking["p_npv_positive"] > 0]
     best_breakeven = float(ranking["breakeven_capex_usd_per_kw"].max())
     if any_positive.empty:
-        viable = f"No site pays for itself in any of the {n_draws:,} simulated futures"
+        viable = (
+            f"On demand-charge savings alone, no site pays for itself in any of the "
+            f"{n_draws:,} simulated futures"
+        )
     else:
         best_count = round(float(any_positive["p_npv_positive"].max()) * n_draws)
         count = len(any_positive)
         viable = (
-            f"Only {count} of {len(ranking)} sites {'pays' if count == 1 else 'pay'} for "
+            f"On demand-charge savings alone, only {count} of {len(ranking)} sites "
+            f"{'pays' if count == 1 else 'pay'} for "
             f"{'itself' if count == 1 else 'themselves'} in any of the {n_draws:,} simulated "
             f"futures, and at best in {best_count:,} of them"
         )
     return (
         f"{viable}; even the top-ranked site ({best['site_id']}) has a good-case (P90) NPV of "
         f"{usd(best['npv_p90'])}. In the central case the best site breaks even only if the "
-        f"battery cost about {usd(best_breakeven)}/kW, versus {usd(capex)}/kW assumed."
+        f"battery cost about {usd(best_breakeven)}/kW, versus {usd(capex)}/kW assumed. Real "
+        "projects usually stack other revenue (for example demand-response payments), which this "
+        "model leaves out."
     )
+
+
+def _revenue_sentence(ranking: pd.DataFrame, sweep: pd.DataFrame) -> str:
+    """How much other revenue would make sites viable, in words (no program amounts assumed)."""
+    need = ranking["required_other_revenue_usd_per_kw_year"]
+    robust = sweep[sweep["sites_robustly_viable"] > 0]
+    tail = (
+        f"at {usd(float(robust['other_revenue_usd_per_kw_year'].iloc[0]))}/kW-year, "
+        f"{int(robust['sites_robustly_viable'].iloc[0])} of {len(ranking)} sites clear the "
+        "robustness bar (P10 NPV above zero)"
+        if not robust.empty
+        else f"even {usd(float(sweep['other_revenue_usd_per_kw_year'].max()))}/kW-year is not "
+        "enough for any site to clear the robustness bar (P10 NPV above zero)"
+    )
+    return (
+        f"To break even in the central case, the best site would need about "
+        f"{usd(float(need.min()))}/kW-year of other revenue on top of bill savings and half the "
+        f"sites about {usd(float(need.median()))}/kW-year; {tail}. Whether any program pays that "
+        "much is not assessed here."
+    )
+
+
+REVENUE_LEVELS = (0.0, 25.0, 50.0, 75.0, 100.0, 150.0, 200.0)
+
+
+def required_other_revenue(sites: list[SiteEconomics], inputs: EconomicInputs) -> pd.DataFrame:
+    """Annual non-bill revenue ($/kW-year, 2025$) each site needs to break even, central case.
+
+    Stands in for revenue streams this model does not include (for example demand-response
+    program payments). Zero if the site already breaks even. Assumes the revenue is earned every
+    year of the project, independent of the tenant.
+    """
+    center = central_draws(inputs)
+    shortfall = np.maximum(-expected_npv(sites, inputs, center)[:, 0], 0.0)
+    factor = annuity_factor(center.discount_rate, inputs.life_years)[0]
+    return pd.DataFrame(
+        {
+            "site_id": [s.site_id for s in sites],
+            "required_other_revenue_usd_per_kw_year": shortfall / (inputs.power_kw * factor),
+        }
+    )
+
+
+def revenue_sweep(
+    npv: np.ndarray,
+    draws: Draws,
+    inputs: EconomicInputs,
+    levels: tuple[float, ...] = REVENUE_LEVELS,
+) -> pd.DataFrame:
+    """How many sites become viable if every site also earned L $/kW-year of other revenue.
+
+    'Likely viable' = median NPV > 0; 'robustly viable' = P10 NPV > 0 (the ranking's own bar).
+    """
+    factor = annuity_factor(draws.discount_rate, inputs.life_years)  # (N,)
+    rows = []
+    for level in levels:
+        stacked = npv + level * inputs.power_kw * factor[None, :]
+        p10, p50 = np.percentile(stacked, [10, 50], axis=1)
+        rows.append(
+            {
+                "other_revenue_usd_per_kw_year": level,
+                "sites_likely_viable": int((p50 > 0).sum()),
+                "sites_robustly_viable": int((p10 > 0).sum()),
+                "n_sites": npv.shape[0],
+            }
+        )
+    return pd.DataFrame(rows)

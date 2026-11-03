@@ -65,8 +65,11 @@ list grows each milestone.
 - **Year-to-year load variation is synthetic noise** (10% lognormal), because there is one weather year.
 - **Churn ends savings permanently, with no re-tenanting and no battery resale.** Hazards by building
   type are relative guesses.
-- **One generic upfront incentive fraction (0–30%)** stands in for real programs (tax credits,
-  state programs), whose terms and eligibility are not modeled.
+- **One generic upfront incentive fraction (0–30%)** stands in for capex-reducing incentives (for
+  example a storage tax credit), whose terms and eligibility are not modeled.
+- **No recurring program revenue.** Demand-response payments (for example ConnectedSolutions) are
+  left out. The model reports the revenue each site would need instead of assuming an amount, so
+  "not viable" means "not viable on bill savings alone".
 - **Costs mix sources:** ATB 2022$ costs are converted to 2025$ with an assumed ×1.10 factor; the
   tariff is 2025.
 - **Rank positions within about 4 places are ties** (Monte Carlo noise between seeds).

@@ -67,3 +67,9 @@ def npv(
     discount = (1 + draws.discount_rate)[None, :, None] ** (-years)
     capex = draws.capex_usd_per_kw * power_kw * (1 - draws.incentive)
     return np.asarray(-capex[None, :] + np.sum((alive * savings - om) * discount, axis=2))
+
+
+def annuity_factor(discount_rate: np.ndarray, years: int) -> np.ndarray:
+    """Present value of $1 a year for `years` years, per draw: sum_t (1 + r)^-t. Shape (N,)."""
+    t = np.arange(1, years + 1)[None, :]
+    return np.asarray(np.sum((1 + discount_rate)[:, None] ** (-t), axis=1))

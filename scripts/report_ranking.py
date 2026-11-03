@@ -123,6 +123,7 @@ def write_results(
             "P90 NPV",
             "Rank by P50",
             "Breakeven capex $/kW",
+            "Other revenue needed $/kW-yr",
         ],
         [
             [
@@ -135,6 +136,7 @@ def write_results(
                 _money(r["npv_p90"]),
                 r["rank_by_p50"],
                 _money(r["breakeven_capex_usd_per_kw"]),
+                _money(r["required_other_revenue_usd_per_kw_year"]),
             ]
             for _, r in ranking.head(10).iterrows()
         ],
@@ -183,6 +185,22 @@ def write_results(
             for _, r in shifts.iterrows()
         ],
     )
+    sweep = pd.read_csv(OUT / "revenue_sweep.csv")
+    revenue = _table(
+        [
+            "Other revenue $/kW-yr",
+            "Sites likely viable (P50 > 0)",
+            "Sites robustly viable (P10 > 0)",
+        ],
+        [
+            [
+                _money(r["other_revenue_usd_per_kw_year"]),
+                int(r["sites_likely_viable"]),
+                int(r["sites_robustly_viable"]),
+            ]
+            for _, r in sweep.iterrows()
+        ],
+    )
     by_type = ranking.groupby("building_type")["rank"].median().sort_values()
     types = _table(["Type", "Median rank"], [[t, f"{v:g}"] for t, v in by_type.items()])
     plain = [f"- **{k.replace('_', ' ').capitalize()}.** {v}" for k, v in text.items()]
@@ -202,6 +220,14 @@ def write_results(
         *top,
         "",
         "Full table: [`ranking.csv`](ranking.csv).",
+        "",
+        "## What if sites also earned other revenue?",
+        "",
+        "Every site gets the same extra $/kW-year (for example demand-response payments, which",
+        "this model does not include). No program amount is assumed; this only shows how much",
+        "would be needed.",
+        "",
+        *revenue,
         "",
         "## Sensitivity: tornado (one input at a time)",
         "",
@@ -225,7 +251,7 @@ def main() -> None:
     settings = load_settings()
     src = settings.resolve(settings.paths.cache_dir) / "results"
     OUT.mkdir(parents=True, exist_ok=True)
-    for name in ("ranking.csv", "tornado.csv", "rank_shifts.csv"):
+    for name in ("ranking.csv", "tornado.csv", "rank_shifts.csv", "revenue_sweep.csv"):
         shutil.copy(src / name, OUT / name)
     ranking, tornado = pd.read_csv(OUT / "ranking.csv"), pd.read_csv(OUT / "tornado.csv")
     shifts = pd.read_csv(OUT / "rank_shifts.csv")

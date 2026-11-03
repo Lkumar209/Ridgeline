@@ -215,6 +215,7 @@ def rank(
     out_dir = settings.resolve(settings.paths.cache_dir) / "results"
     result.ranking.to_csv(out_dir / "ranking.csv", index=False)
     result.tornado.to_csv(out_dir / "tornado.csv", index=False)
+    result.revenue_sweep.to_csv(out_dir / "revenue_sweep.csv", index=False)
     pd.DataFrame([vars(s) for s in result.shifts]).to_csv(out_dir / "rank_shifts.csv", index=False)
     meta = {"n_draws": n_draws, "seed": settings.scenarios.seed, "seconds": round(elapsed, 2)}
     (out_dir / "explanations.json").write_text(
@@ -231,6 +232,7 @@ def rank(
         "p_npv_positive",
         "rank_by_p50",
         "breakeven_capex_usd_per_kw",
+        "required_other_revenue_usd_per_kw_year",
     ]
     typer.echo(result.ranking[columns].round(0).to_string(index=False))
     for key, sentence in result.explanations.items():

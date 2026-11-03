@@ -256,3 +256,19 @@ original site list. Rerunning `scripts/evaluate_imputation.py` refreshes them.
 **Consequence.** No site pays back at central costs; the ranking orders sites by how little they
 lose,
 and how reliably. Cost inputs decide *whether* storage pays; churn and the proxy tariff decide *where*.
+
+## ADR-012: Report the other revenue needed, don't assume program amounts (M4 follow-up)
+
+**Context.** No site is viable on demand-charge savings alone. Real projects often stack recurring
+revenue such as utility demand-response payments, but we have no sourced, current amounts for them.
+
+**Decision.**
+- **Upfront incentive scope:** `upfront_incentive_fraction` covers upfront, capex-reducing incentives
+  only.
+- **Recurring revenue is reported, not assumed:** each site gets the annual $/kW-year it would need to
+  break even (central case), plus a viability table over a $0–200/kW-year sweep.
+- **Breakeven capex ($/kW) is the main companion metric to the rank.** It tells a reader how far from
+  viable each site is when NPVs are uniformly negative.
+
+**Rejected.** A "stacked incentives" scenario with a guessed $/kW-year: it would present an unsourced
+number as a result. The sweep shows the same information without picking a value.

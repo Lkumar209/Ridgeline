@@ -149,8 +149,11 @@ upfront_incentive_fraction:
   unit: fraction of capex
   source: ASSUMPTION
   notes: >-
-    Stands in for upfront incentives (federal tax credit, state programs) whose availability and
-    eligibility for a given project are uncertain. 0 means none. Not a statement of any program's terms.
+    Covers only upfront, capex-reducing incentives, for example a federal investment tax credit
+    for storage if a project qualifies. It does NOT cover recurring performance payments such as
+    utility demand-response programs (for example Mass Save ConnectedSolutions); those are "other
+    revenue", reported separately as the revenue a site would need to break even. No program's
+    eligibility, rate or amount is asserted here; 0 means no upfront incentive.
 
 capacity_fade_per_year:
   value: 0.02
