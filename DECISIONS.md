@@ -272,3 +272,26 @@ revenue such as utility demand-response payments, but we have no sourced, curren
 
 **Rejected.** A "stacked incentives" scenario with a guessed $/kW-year: it would present an unsourced
 number as a result. The sweep shows the same information without picking a value.
+
+## ADR-013: A read-only API over rank outputs, and one static page (M5)
+
+**Decision.**
+- **API:** FastAPI serves the files `ridgeline rank` writes (`ranking.csv`, `fan.csv`,
+  `explanations.json`, `revenue_sweep.csv`), plus daily load from the cache. It never runs the
+  simulation or the Monte Carlo.
+- **Testability:** `create_app()` takes a data provider, so tests inject in-memory data and run
+  offline.
+- **Missing results** return 503 with "run `ridgeline rank`".
+- **Page:** one static page with vanilla JS and hand-written SVG charts. Leaflet comes from a pinned
+  CDN URL with integrity hashes.
+- **Map colors:** pins are colored in 5 rank groups on a validated ordinal ramp.
+- **Locations:** PUMA centroid plus a deterministic offset, labeled approximate.
+- **Cash-flow fan:** `npv()` became the sum of `discounted_cashflows()`, so the fan chart and the
+  ranking share one formula; a test checks the fan's last year equals the NPV percentiles.
+
+**Rejected.**
+- **A database:** 40 sites fit in memory, and files keep the pipeline inspectable.
+- **A JS framework or chart library:** two small charts don't justify a build step.
+- **Computing in the API:** results could disagree with `docs/m4`.
+- **40 distinct colors:** this would imply rank precision the model doesn't have.
+- **Geocoding real addresses:** there are none.

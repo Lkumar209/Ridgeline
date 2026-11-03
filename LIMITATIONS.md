@@ -76,6 +76,15 @@ list grows each milestone.
 - **Imputation error is not propagated.** The current sites have no real gaps; real meter data would
   need the M2 error distribution added.
 
+## API and map (M5)
+- **Map pins are approximate.** Each pin is placed at its PUMA centroid plus an offset of about 1 km;
+  ComStock has no addresses.
+- **Rank colors use 5 groups of 8,** because ranks within about 4 places are ties.
+- **The API serves the last `ridgeline rank` run.** It does not recompute, and after a new run it
+  needs a restart.
+- **The page needs the internet** for the Leaflet library and OpenStreetMap tiles. Tests don't.
+- **No auth, no database, local use only.**
+
 ## MECo G-2 tariff (`data/tariffs/meco_g2_sema.json`)
 - **Delivery service only.** The record's `servicetype` is Delivery. Supply (basic service) energy
   costs are excluded, so round-trip losses and energy arbitrage are under-valued

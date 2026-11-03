@@ -213,3 +213,41 @@ it was caught. Newest milestone at the bottom.
 7. *A silent no-op edit:* a `str.replace` without an assertion left a table header saying "3+" after
    the threshold became 5. Caught by ruff flagging the now-unused variable. Edits to existing code
    now assert their match.
+
+## M4 follow-up, M5 (API and map) and M7 (docs)
+
+**Key prompts**
+- M4 follow-up: say exactly what the incentive covers; don't guess program amounts; precise
+  headline wording; breakeven as the main companion metric.
+- M5: a minimal FastAPI app (sites, rankings, per-site detail) and one Leaflet page (colored by rank;
+  click for load curve and fan chart), with API tests. Then M7: README, ONBOARDING with 3 given starter
+  features, architecture diagram, fresh-clone test.
+
+**What was generated**
+- "Other revenue needed" metric and revenue sweep (ADR-012); PUMA-centroid locations; cash-flow
+  fan; `api/` and `web/`; `ridgeline serve`; `make demo`; ONBOARDING.md; docs/architecture.md; a
+  README rewrite; 18 new tests.
+
+**What was wrong or rejected, and how it was caught**
+1. *A "stacked incentives" scenario would have needed a guessed $/kW-year.* Rejected in favor of
+   reporting the revenue each site needs plus a sweep, so no unsourced number appears as a result.
+2. *`rank --dev-subset` could not run after `fetch-data --dev-subset`,* because it always simulated
+   all 40 sites, and the cache key ignored which sites were ranked. Caught while planning the
+   README's dev loop. Fixed, with a regression test.
+3. *Cache miss and cache hit gave different NPVs (by ~1e-11).* Caught by a byte comparison of a fresh
+   rank against the committed `docs/m4/ranking.csv`. Two causes:
+   - pandas' CSV float parser (fixed: always read savings back from the CSV; regression test);
+   - the cash-flow refactor changed the summation order (legitimate; `docs/m4` regenerated, with
+     every reported number unchanged).
+4. *The savings fingerprint ignored `data/tariffs.py` and `data/schemas.py`,* which also change
+   bills. Caught while writing ONBOARDING's "likely to break" section. Fixed.
+5. *Chart edge labels were clipped ("year 1" for "year 15"),* and the y ticks were odd values.
+   Caught by viewing Playwright screenshots, not by tests. Fixed with edge-anchored labels and round
+   ticks.
+6. *A `pkill -f "ridgeline serve"` killed its own shell* (the pattern matched the command line).
+   Switched to stopping the server by its port.
+7. *README draft said the first `make demo` takes ~40 s;* fetch plus simulate is about a minute.
+   Corrected.
+8. *The scratch tooling couldn't reach unpkg or OSM.* Rather than vendor Leaflet, the screenshot run
+   routed the pinned CDN URL to a copy from the npm registry. The SRI hashes were computed from that
+   same file.
