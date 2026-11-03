@@ -23,6 +23,7 @@ class SiteSummary(_Out):
     tariff_is_proxy: bool
     rank: int
     breakeven_capex_usd_per_kw: float
+    breakeven_label: str
     location: Location
 
 
@@ -37,6 +38,7 @@ class RankingRow(_Out):
     p_npv_positive: float
     rank_by_p50: int
     breakeven_capex_usd_per_kw: float
+    breakeven_label: str
     required_other_revenue_usd_per_kw_year: float
 
 

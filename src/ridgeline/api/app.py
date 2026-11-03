@@ -24,6 +24,7 @@ from ridgeline.api.models import (
     SiteDetail,
     SiteSummary,
 )
+from ridgeline.ranking.pipeline import breakeven_label
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
@@ -53,7 +54,10 @@ def create_app(get_data: Callable[[], ApiData], web_dir: Path | None = WEB_DIR) 
         return Rankings(
             run=d.run,
             explanations=d.explanations,
-            rows=[RankingRow(**_fields(r, RankingRow)) for r in rows.to_dict(orient="records")],
+            rows=[
+                RankingRow(**_fields(_labeled(r), RankingRow))
+                for r in rows.to_dict(orient="records")
+            ],
             revenue_sweep=[
                 RevenueLevel(**_fields(r, RevenueLevel))
                 for r in d.revenue_sweep.to_dict(orient="records")
@@ -70,7 +74,7 @@ def create_app(get_data: Callable[[], ApiData], web_dir: Path | None = WEB_DIR) 
         loads = d.daily_load(d.sites[site_id])
         return SiteDetail(
             site=_summary(d, site_id),
-            ranking=RankingRow(**_fields(row, RankingRow)),
+            ranking=RankingRow(**_fields(_labeled(row), RankingRow)),
             load_curve=[
                 DailyLoad(**_fields(r, DailyLoad)) for r in loads.to_dict(orient="records")
             ],
@@ -80,6 +84,14 @@ def create_app(get_data: Callable[[], ApiData], web_dir: Path | None = WEB_DIR) 
     if web_dir is not None:
         app.mount("/", StaticFiles(directory=web_dir, html=True), name="web")
     return app
+
+
+def _labeled(record: dict[Any, Any]) -> dict[Any, Any]:
+    """Add the breakeven wording the page shows ("never pays back ..." when <= $0/kW)."""
+    return {
+        **record,
+        "breakeven_label": breakeven_label(float(record["breakeven_capex_usd_per_kw"])),
+    }
 
 
 def _fields(record: dict[Any, Any], model: type[Any]) -> dict[str, Any]:
@@ -99,6 +111,7 @@ def _summary(d: ApiData, site_id: str) -> SiteSummary:
         tariff_is_proxy=bool(row["tariff_is_proxy"]),
         rank=int(row["rank"]),
         breakeven_capex_usd_per_kw=float(row["breakeven_capex_usd_per_kw"]),
+        breakeven_label=breakeven_label(float(row["breakeven_capex_usd_per_kw"])),
         location=Location(
             lat=float(loc["lat"]), lon=float(loc["lon"]), precision=str(loc["precision"])
         ),
