@@ -321,3 +321,29 @@ validator that rejects outputs inconsistent with the source) and the download re
 9. *Download retries:* the earlier "download-retry PR" never existed (see the previous entry).
    Built now with a stated policy (transient errors only, so a blocked domain is still reported
    at once), tested with an `httpx.MockTransport`.
+
+## M6 live run
+
+**Key prompt.** The user created an Anthropic API key and asked for the live evals. (The key was
+pasted into chat; the user was told it can't be forgotten from the transcript and should be
+revoked after the run. It was used only in the command environment, never written to a file.)
+
+**Results on claude-opus-5-5, effort medium**
+- First live run: **9/11**. Second, after the fixes below: **11/11**.
+
+**What was wrong, and how it was caught**
+1. *The eval was wrong about "no demand charge".* For "There is no demand charge under this rate"
+   the model answered 0 with that exact quote. The eval expected null and the validator rejected
+   it (no digit in the quote). Zero is the better reading: the text states it. Fixed the expected
+   value, the prompt (says so explicitly) and the validator: 0 is accepted only when the quote says
+   "no/without … charge". A test checks an unrelated "not" can't justify a zero.
+2. *A real omission, caught by the validator.* One explanation of cs-144167 left out "never pays
+   back". To see the text, the eval report now prints failed explanations. In 3 more runs of that
+   case the caveat was present each time, so this was run-to-run variation, and the validator
+   stopped the bad output from being shown. That is the intended design.
+3. *The eval was too literal about wording.* It required the word "robust"; the model wrote "ranks
+   1 of 40 by bad-case (P10) NPV", which says the same thing more precisely. The expected phrase is
+   now "P10" (naming the measure is what matters).
+
+**Lesson.** Two of three live failures were eval mistakes, not model mistakes. Hand-written mock
+answers can't show that; a live run is needed before trusting an eval set.

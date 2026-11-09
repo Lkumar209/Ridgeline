@@ -32,6 +32,7 @@ class CaseResult:
     case_id: str
     passed: bool
     problems: list[str]
+    output: str = ""  # the model's text, shown for failed cases
 
 
 def load_cases(path: Path = CASES_FILE) -> dict[str, list[dict[str, Any]]]:
@@ -84,7 +85,8 @@ def run_extraction_case(
             got = fields[name].value
             if not _same(got, want):
                 problems.append(f"{name}: got {got!r}, expected {want!r}")
-    return CaseResult("extraction", case["id"], not problems, problems)
+    output = checked.output.model_dump_json(indent=1) if checked.output is not None else ""
+    return CaseResult("extraction", case["id"], not problems, problems, output)
 
 
 def run_explanation_case(client: LLMClient, case: dict[str, Any]) -> CaseResult:
@@ -96,7 +98,7 @@ def run_explanation_case(client: LLMClient, case: dict[str, Any]) -> CaseResult:
         for phrase in case.get("expected_mentions", [])
         if phrase.casefold() not in text.casefold()
     ]
-    return CaseResult("explanation", case["id"], not problems, problems)
+    return CaseResult("explanation", case["id"], not problems, problems, text)
 
 
 def run_evals(
@@ -113,6 +115,8 @@ def report(results: list[CaseResult]) -> str:
     for r in results:
         lines.append(f"{'PASS' if r.passed else 'FAIL'}  {r.kind:<11} {r.case_id}")
         lines += [f"      - {p}" for p in r.problems]
+        if not r.passed and r.kind == "explanation" and r.output:
+            lines.append(f"      output: {r.output}")
     passed = sum(r.passed for r in results)
     lines.append(f"{passed}/{len(results)} cases passed")
     return "\n".join(lines)

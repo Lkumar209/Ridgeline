@@ -341,6 +341,10 @@ number as a result. The sweep shows the same information without picking a value
 - **Recording real model responses as the mock fixtures:** no key was available in the build
   session; hand-written answers are labeled as hand-written instead of being passed off as recorded.
 
+**Amendment (live run).** "There is no demand charge" is a stated value of 0, not a missing one.
+The validator accepts 0 only when the quote says "no/without … charge", so an unrelated negation
+("must not exceed 200 kW") cannot justify a zero.
+
 ## ADR-015: Retry only transient download failures
 
 **Decision.** `data/cache.py::download` retries connection errors, timeouts, 429 and 5xx up to

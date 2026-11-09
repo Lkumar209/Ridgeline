@@ -155,14 +155,18 @@ extraction:
           page 4 summary; the text does not say which applies."
 
   - id: cents_energy_only
-    about: Synthetic energy-only rate; checks the cents-to-dollars conversion and null demand.
+    about: >
+      Synthetic energy-only rate; checks the cents-to-dollars conversion, and that "no demand
+      charge" is read as an explicit $0, not as missing. (First written expecting null; the first
+      live run answered 0 with the exact quote, which is the better reading.)
     text: |
       Small General Service (Rate G-1). Energy charge: 1.234 cents per kilowatt-hour for all
       kilowatt-hours. There is no demand charge under this rate.
     expected:
       rate_name: G-1
       energy_rate_usd_per_kwh: 0.01234
-      demand_charge_usd_per_kw: null
+      demand_charge_usd_per_kw: 0
+      fixed_charge_usd_per_month: null
     mock_response:
       rate_name:
         value: G-1
@@ -172,8 +176,10 @@ extraction:
         value: 0.01234
         confidence: 0.9
         evidence: "1.234 cents per kilowatt-hour"
-      notes:
-        - "The text says there is no demand charge; no dollar amount is given for it."
+      demand_charge_usd_per_kw:
+        value: 0
+        confidence: 0.9
+        evidence: "There is no demand charge under this rate."
 
   - id: kva_and_interval
     about: Synthetic billing-demand clause with a kVA fraction and a 30-minute interval in digits.
@@ -220,7 +226,7 @@ explanation:
       required_other_revenue_usd_per_kw_year: 130.78673021617362
       top_site_by_p10: cs-144167
       top_site_by_p50: cs-118913
-    expected_mentions: ["robust"]
+    expected_mentions: ["P10"]
     mock_response: >-
       Site cs-144167, a secondary school, ranks 1 of 40 on robustness, meaning its bad-case
       outcome (the P10 NPV, which only 1 in 10 simulated futures does worse than) is the least

@@ -136,3 +136,13 @@ def test_every_number_in_the_facts_is_allowed():
     facts_text = render_facts(FACTS)
     checked = check_explanation(facts_text + " cs-144167 never pays back; proxy.", rules_for(FACTS))
     assert not [e for e in checked.errors if "number" in e]
+
+
+def test_an_explicit_no_charge_is_a_stated_zero() -> None:
+    source = "Rate G-1. There is no demand charge under this rate. Use must not exceed 200 kW."
+    zero = _f(0, "There is no demand charge under this rate.")
+    raw = _extraction(demand_charge_usd_per_kw=zero)
+    assert parse_and_check(raw, source, 0.6).accepted
+    # A negation that is not about a charge does not justify a zero.
+    raw = _extraction(fixed_charge_usd_per_month=_f(0, "Use must not exceed 200 kW."))
+    assert not parse_and_check(raw, source, 0.6).accepted

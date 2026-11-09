@@ -70,6 +70,8 @@ For each field return value, confidence (0 to 1) and evidence:
   character for character; do not paraphrase, fix typos or join separate passages.
 - If the text does not state the value, return value null, evidence null and confidence 0. Do not
   infer, estimate or fill in a typical value: a missing number must stay missing.
+- If the text says a charge does not apply ("there is no demand charge"), that is a stated value of
+  0; quote that sentence as the evidence.
 - If the text gives two different values for the same field and does not say which applies,
   return value null and explain the conflict in notes.
 - Give dollar amounts in dollars (convert cents to dollars) and percentages as fractions

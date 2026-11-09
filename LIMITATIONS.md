@@ -88,9 +88,11 @@ list grows each milestone.
   failing still stops with the URL and the error.
 
 ## LLM agent layer (M6)
-- **Not run against a live model while it was built.** No API key was available in that session.
-  The offline evals use hand-written answers, so they test the harness, prompts and validators,
-  not model quality. Run `uv run ridgeline evals --live` with a key to score a real model.
+- **Live results are from very few runs.** On claude-opus-5-5 the first live run passed 9/11 and,
+  after the fixes in AI_LOG, a second passed 11/11. Outputs vary run to run: in 3 re-runs of one
+  explanation case, 1 dropped the "never pays back" caveat (the validator rejected it). Treat
+  11/11 as "works", not as a measured accuracy.
+- **Offline evals test the harness, not the model.** `make evals` uses hand-written answers.
 - **The validators check grounding, not truth.** An extracted value can be correctly quoted from a
   tariff that is itself outdated or for the wrong rate; a quoted number can sit in the right
   sentence but belong to a different charge. Review flagged fields and the evidence quotes.

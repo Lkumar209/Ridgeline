@@ -15,11 +15,11 @@ state, results, gotchas, and what is left. Read it top to bottom once. After tha
   **illustrative**.
 - **Repo:** https://github.com/Lkumar209/Ridgeline (owner `Lkumar209`, the user Laxya Kumar).
 - **Done:** M0–M7, plus follow-ups and download retries. CI is green.
-- **M6 (LLM agent layer) is built and tested offline** (mock client, 11 evals, ADR-014). Its live
-  path has **not** been run: no `ANTHROPIC_API_KEY` was available. First live step: set the key and
-  run `uv run ridgeline evals --live`.
-- **Open PR:** **#5**. It holds the clarity fixes, this handoff, download retries and M6, all on
-  branch `claude/dazzling-cori-pty3ol`, waiting for the user to merge.
+- **M6 (LLM agent layer) is done** (ADR-014): 11/11 evals offline and live on claude-opus-5-5
+  (the first live run was 9/11; fixes in AI_LOG "M6 live run").
+- **PRs:** #1–#5 merged. The live-eval fixes are on branch `claude/dazzling-cori-pty3ol` in a new PR.
+- **Only open item:** a real G-3 tariff for the 23 proxy sites (§8), which needs the user's URDB
+  JSON or OpenEI key.
 - **Headline finding:** on demand-charge savings alone, no site pays back at NREL ATB 2026
   battery costs (~$1,570/kW). Only cs-118913 would break even in the central case, at a hypothetical
   ~$56/kW battery. The other 39 never pay back, even at $0 battery cost (savings < fixed O&M ~$4.7k/yr).
@@ -30,7 +30,7 @@ state, results, gotchas, and what is left. Read it top to bottom once. After tha
 ### Suggested opening message for the next chat
 
 > Read HANDOFF.md, ONBOARDING.md and DECISIONS.md in the Ridgeline repo. Check whether PR #5 is
-> merged. Then [run the M6 live evals with my key / do X]. Follow the working rules in HANDOFF.md section 3.
+> merged. Then [add the G-3 tariff from this file / do X]. Follow the working rules in HANDOFF.md section 3.
 
 ---
 
@@ -81,7 +81,7 @@ with commands `fetch-data`, `simulate`, `rank`, `serve`. All exist; M6 added `ev
 - **M3** threshold controller, bill calculator, perfect-foresight LP bound, property tests. **Done.**
 - **M4** 15-yr Monte Carlo, P10/P50/P90, P(NPV>0), robustness score, tornado, churn. **Done.**
 - **M5** API and map UI. **Done.**
-- **M6** agent layer with the Anthropic SDK. **Done offline** (live path untested; no key); §9.
+- **M6** agent layer with the Anthropic SDK. **Done**, evals 11/11 offline and live; §9.
 - **M7** hardening and docs: fresh-clone test, README, ONBOARDING, architecture diagram,
   limitations. **Done.**
 
@@ -455,9 +455,9 @@ make demo           # fetch + rank + serve (http://127.0.0.1:8000)
 
 ## 8. Open items and remaining work (prioritized)
 
-1. **Merge PR #5** (user action), then restart the branch from `origin/main`.
-2. **M6 live check** (built; see §9). Needs the user's `ANTHROPIC_API_KEY`. Run
-   `uv run ridgeline evals --live`, fix prompts if cases fail, and record results in AI_LOG.
+1. **Merge the live-eval PR** (user action), then restart the branch from `origin/main`.
+2. **M6 live check: done** (11/11 on claude-opus-5-5). The user's key was pasted into chat and
+   should be revoked in the Console; never ask for keys in chat (use the credential form).
 3. **A real MECo G-3 tariff for sites above 200 kW** (the user was searching). When it arrives:
    - save it verbatim to `data/tariffs/`;
    - add a data-contract test like `test_committed_meco_g2_matches_its_published_values`;

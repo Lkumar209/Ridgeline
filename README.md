@@ -100,6 +100,7 @@ GitHub Actions runs the same `make check` on every push and pull request.
 
 ## Status
 
-M0–M7 are done. The M6 agent layer is tested offline (mock client, 11 evals); its live path was
-not run while it was built, because no API key was available. To try it, set `ANTHROPIC_API_KEY`
-(and optionally `RIDGELINE_LLM_MODEL`) and run `uv run ridgeline evals --live`.
+M0–M7 are done. The M6 agent layer passes its 11 evals offline (mock client) and live on
+claude-opus-5-5 (11/11 after fixing two issues the first live run found; see `AI_LOG.md`). To run
+it yourself, set `ANTHROPIC_API_KEY` (and optionally `RIDGELINE_LLM_MODEL`) and run
+`uv run ridgeline evals --live`. A run costs well under $1.
