@@ -12,6 +12,14 @@ import httpx
 import pandas as pd
 import typer
 
+from ridgeline.agent.client import (
+    KEY_ENV_VAR,
+    AgentSettings,
+    AnthropicClient,
+    LLMClient,
+    has_api_key,
+    resolve_model,
+)
 from ridgeline.assumptions import load_assumptions
 from ridgeline.battery.simulate import History, simulate_sites
 from ridgeline.config import Settings, load_settings
@@ -283,3 +291,112 @@ def serve(
 
     typer.echo(f"Ridgeline (illustrative) at http://{host}:{port}")
     uvicorn.run(create_app(provider), host=host, port=port)
+
+
+# ---- M6: agent layer -------------------------------------------------------------------------
+
+
+def _live_client(settings: Settings) -> AnthropicClient:
+    if not has_api_key():
+        typer.echo(
+            f"{KEY_ENV_VAR} is not set; this command calls the Anthropic API. "
+            "Set it in your environment (see .env.example).",
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    agent = settings.agent
+    model = resolve_model(agent.model)
+    typer.echo(f"model: {model} (illustrative; outputs are checked before they are shown)")
+    return AnthropicClient(AgentSettings(model, agent.max_tokens, agent.effort))
+
+
+def _print_checked(errors: list[str], warnings: list[str]) -> None:
+    for w in warnings:
+        typer.echo(f"  review: {w}")
+    for e in errors:
+        typer.echo(f"  REJECTED: {e}", err=True)
+
+
+@app.command()
+def evals(
+    live: bool = typer.Option(
+        False, "--live", help="Score a real model (needs ANTHROPIC_API_KEY)."
+    ),
+    config: Path | None = typer.Option(None, help="Config file (default: config/default.yaml)."),
+) -> None:
+    """Run the M6 eval set: offline against the mock client, or live with --live."""
+    from ridgeline.agent.evals import load_cases, mock_client, report, run_evals
+
+    settings = load_settings(config)
+    cases = load_cases()
+    client: LLMClient = _live_client(settings) if live else mock_client(cases)
+    if not live:
+        typer.echo("offline: mock client with hand-written responses (tests the harness)")
+    results = run_evals(client, settings.agent.min_confidence, cases)
+    typer.echo(report(results))
+    if not all(r.passed for r in results):
+        raise typer.Exit(code=1)
+
+
+@app.command("extract-tariff")
+def extract_tariff_cmd(
+    path: Path = typer.Argument(
+        ..., help="Tariff text file, or a URDB JSON (uses its description)."
+    ),
+    config: Path | None = typer.Option(None, help="Config file (default: config/default.yaml)."),
+) -> None:
+    """Extract demand-tariff parameters from text with an LLM, checked against the text."""
+    from ridgeline.agent.tariff_extract import extract_tariff
+
+    settings = load_settings(config)
+    raw = path.read_text()
+    text = str(json.loads(raw)["items"][0]["description"]) if path.suffix == ".json" else raw
+    checked = extract_tariff(_live_client(settings), text, settings.agent.min_confidence)
+    if checked.output is not None:
+        for name, field in checked.output.fields().items():
+            shown = "not stated" if field.value is None else f"{field.value}"
+            quote = f'  "{field.evidence}"' if field.evidence else ""
+            typer.echo(f"{name:<28} {shown:<20} conf {field.confidence:.2f}{quote}")
+        for note in checked.output.notes:
+            typer.echo(f"note: {note}")
+    _print_checked(checked.errors, checked.warnings)
+    if not checked.accepted:
+        raise typer.Exit(code=1)
+
+
+@app.command()
+def explain(
+    site_id: str = typer.Argument(..., help="Site ID, e.g. cs-144167."),
+    config: Path | None = typer.Option(None, help="Config file (default: config/default.yaml)."),
+) -> None:
+    """Explain one site's ranking in plain language with an LLM, grounded in `rank` outputs."""
+    from ridgeline.agent.explain import explain_site, facts_from_ranking, render_facts
+
+    settings = load_settings(config)
+    results = settings.resolve(settings.paths.results_dir)
+    if not (results / "ranking.csv").exists():
+        typer.echo(f"no ranking.csv in {results}; run `ridgeline rank` first", err=True)
+        raise typer.Exit(code=1)
+    run = json.loads((results / "explanations.json").read_text())["run"]
+    assumptions = load_assumptions()
+    inputs = EconomicInputs.from_assumptions(
+        assumptions, BatterySpec.from_assumptions(assumptions).power_kw
+    )
+    try:
+        facts = facts_from_ranking(
+            pd.read_csv(results / "ranking.csv"),
+            site_id,
+            n_draws=int(run["n_draws"]),
+            life_years=inputs.life_years,
+            capex_usd_per_kw=inputs.capex_usd_per_kw.central,
+        )
+    except KeyError as e:
+        typer.echo(str(e), err=True)
+        raise typer.Exit(code=1) from None
+    checked = explain_site(_live_client(settings), facts)
+    typer.echo("Facts given to the model:\n" + render_facts(facts) + "\n")
+    if checked.accepted:
+        typer.echo(checked.output)
+    _print_checked(checked.errors, checked.warnings)
+    if not checked.accepted:
+        raise typer.Exit(code=1)

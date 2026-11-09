@@ -1,4 +1,4 @@
-.PHONY: install check lint fmt typecheck test fetch fetch-dev rank serve demo
+.PHONY: install check lint fmt typecheck test evals fetch fetch-dev rank serve demo
 
 install:
 	uv sync
@@ -18,6 +18,10 @@ typecheck:
 
 test:
 	uv run pytest -m "not network"
+
+# M6 eval set against the mock client (offline). Live: uv run ridgeline evals --live
+evals:
+	uv run ridgeline evals
 
 fetch:
 	uv run ridgeline fetch-data

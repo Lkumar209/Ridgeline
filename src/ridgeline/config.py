@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -113,12 +114,23 @@ class TariffProxy(_Frozen):
     assumption_key: str
 
 
+class AgentConfig(_Frozen):
+    """LLM agent layer (M6). $RIDGELINE_LLM_MODEL overrides `model`; the key is env-only."""
+
+    model: str
+    max_tokens: int = Field(gt=0)
+    effort: Literal["low", "medium", "high", "xhigh", "max"]
+    # Extracted values below this confidence are kept but flagged for review.
+    min_confidence: float = Field(ge=0, le=1)
+
+
 class Settings(_Frozen):
     paths: PathsConfig
     comstock: ComStockConfig
     site_selection: SiteSelectionConfig
     gaps: GapsConfig
     scenarios: ScenariosConfig
+    agent: AgentConfig
     tariff_proxies: list[TariffProxy] = Field(default_factory=list)
 
     def resolve(self, path: Path) -> Path:
