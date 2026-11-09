@@ -68,3 +68,12 @@ scenarios:
   seed: 2026
   # 8000: seed-to-seed P10 noise ~$300 vs ~$1,900 at 2000 draws (docs/m4_ranking.md).
   n_draws: 8000
+
+agent:
+  # LLM agent layer (M6): tariff extraction and site explanations. $RIDGELINE_LLM_MODEL overrides
+  # the model; the API key comes only from $ANTHROPIC_API_KEY. Tests and `ridgeline evals` use a
+  # mock client and need neither.
+  model: claude-opus-5-5
+  max_tokens: 16000
+  effort: medium
+  min_confidence: 0.6

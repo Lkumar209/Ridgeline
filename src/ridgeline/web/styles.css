@@ -49,23 +49,27 @@ body {
   background: var(--surface);
   color: var(--text);
 }
-header, .explain, footer { padding: 16px 24px; max-width: 1200px; margin: 0 auto; }
+header, footer { padding: 16px 24px; max-width: 1200px; margin: 0 auto; }
 h1 { margin: 0 0 4px; font-size: 22px; }
 h2 { font-size: 16px; margin: 0 0 8px; }
 h3 { font-size: 14px; margin: 16px 0 4px; color: var(--text-2); font-weight: 600; }
 .tag { font-size: 12px; font-weight: 500; color: var(--text-2); border: 1px solid var(--grid);
        border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
 .lede { margin: 0; color: var(--text-2); max-width: 900px; }
+/* Desktop: explanations fill the space under the map; the detail panel spans both rows. */
 main { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; padding: 0 24px;
-       max-width: 1200px; margin: 0 auto; }
+       max-width: 1200px; margin: 0 auto; align-items: start;
+       grid-template-areas: "map detail" "explain detail"; }
+.map-wrap { grid-area: map; }
+.detail { grid-area: detail; }
+.explain { grid-area: explain; }
 #map { height: 520px; border-radius: 8px; border: 1px solid var(--grid); background: var(--panel); }
 .map-wrap { position: relative; }
 .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: var(--text-2); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
 .note, .hint, footer { color: var(--muted); font-size: 13px; }
-.detail { background: var(--panel); border: 1px solid var(--grid); border-radius: 8px; padding: 16px;
-          min-height: 520px; }
+.detail { background: var(--panel); border: 1px solid var(--grid); border-radius: 8px; padding: 16px; }
 .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; margin: 8px 0; }
 .stat .k { color: var(--text-2); font-size: 12px; }
 .stat .v { font-size: 16px; font-variant-numeric: tabular-nums; }
@@ -78,8 +82,8 @@ main { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; padding: 0 24px
 .explain li { margin-bottom: 6px; color: var(--text-2); }
 .explain b { color: var(--text); }
 @media (max-width: 860px) {
-  main { grid-template-columns: 1fr; padding: 0 16px; }
-  header, .explain, footer { padding: 12px 16px; }
+  main { grid-template-columns: 1fr; padding: 0 16px;
+         grid-template-areas: "map" "detail" "explain"; }
+  header, footer { padding: 12px 16px; }
   #map { height: 380px; }
-  .detail { min-height: 0; }
 }

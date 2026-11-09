@@ -11,11 +11,14 @@ All numbers come from `docs/m4/results.md`, which is generated from `ridgeline r
   - At NREL ATB 2026 costs for a 2-hour commercial battery (central $1,570/kW in 2025$, about
     $196k for 125 kW), with MECo G-2 delivery rates and the practical controller, only 1 of 40
     sites has a positive NPV in even one of 8,000 simulated futures.
-  - **Breakeven battery cost is the clearest number:** the best site breaks even in the central
-    case only at about **$56/kW**. The other 39 lose money even if the battery were free, because
-    their yearly bill savings are smaller than the ~$4.7k/yr fixed O&M.
-- **How much other revenue would it take?** About **$124/kW-year** for the best site and $147 for
-  the median site, on top of bill savings, to break even in the central case. At $200/kW-year,
+  - **Breakeven battery cost is the clearest number.** The site closest to breaking even is
+    cs-118913 (best by median NPV, but ranked 6th on robustness because of its high tenant churn).
+    In the central case it breaks even only if the battery cost about **$56/kW**.
+  - **The other 39 never pay back, even at $0 battery cost,** because their yearly bill savings are
+    smaller than the ~$4.7k/yr fixed O&M. The most robust site (cs-144167, ranked 1st on P10 NPV)
+    is one of them; it simply loses least, most reliably.
+- **How much other revenue would it take?** About **$124/kW-year** for the site needing the least
+  (cs-118913) and $147 for the median site, on top of bill savings, to break even in the central case. At $200/kW-year,
   31 of 40 sites clear the robustness bar (P10 NPV above zero). Whether any program pays that much
   is not assessed here.
 - **So the ranking answers "where would a battery hurt least, most reliably"** on bill savings alone.

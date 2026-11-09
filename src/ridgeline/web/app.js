@@ -50,7 +50,7 @@ function drawMap(sites, onSelect) {
     }).addTo(map);
     marker.bindTooltip(
       `<b>${site.site_id}</b> · ${site.building_type}<br>Rank ${site.rank} of ${sites.length}` +
-        ` · breakeven ${money(site.breakeven_capex_usd_per_kw)}/kW`,
+        ` · breakeven: ${site.breakeven_label}`,
     );
     marker.on("click", () => onSelect(site.site_id));
     markers.push(marker);
@@ -157,7 +157,7 @@ async function showSite(siteId) {
       ${d.site.tariff_is_proxy ? "tariff: G-2 values used as a proxy (above 200 kW)" : "tariff: MECo G-2"}</div>
     <div class="stats">
       ${stat("Robustness rank", `${r.rank} (by median: ${r.rank_by_p50})`)}
-      ${stat("Breakeven battery cost", `${money(r.breakeven_capex_usd_per_kw)}/kW`)}
+      ${stat("Breakeven battery cost", r.breakeven_label)}
       ${stat("NPV P10 / P50 / P90", `${money(r.npv_p10)} / ${money(r.npv_p50)} / ${money(r.npv_p90)}`)}
       ${stat("Other revenue to break even", `${money(r.required_other_revenue_usd_per_kw_year)}/kW-yr`)}
     </div>

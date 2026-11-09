@@ -117,7 +117,7 @@ def rank_sites(
     )
     gap = neighbour_gap(base)
     explanations = {
-        "headline": _headline(base, inputs, n_draws),
+        "headline": headline_sentence(base, inputs, n_draws),
         "other_revenue": _revenue_sentence(base, sweep),
         "closeness": (
             f"The sites are close together: neighbours in the ranking differ by a median "
@@ -164,7 +164,8 @@ def _seed_stability(
 def breakeven_capex(sites: list[SiteEconomics], inputs: EconomicInputs) -> pd.DataFrame:
     """Capex ($/kW, 2025$) at which a site's central-case expected NPV is zero.
 
-    Negative means the site loses money even if the battery were free (O&M exceeds savings).
+    Zero or negative means it never pays back, even at $0 battery cost (O&M exceeds savings);
+    `breakeven_label` turns that into words for readers.
     """
     center = central_draws(inputs)
     present_value = expected_npv(sites, inputs, center.with_value("capex_usd_per_kw", 0.0))[:, 0]
@@ -207,11 +208,26 @@ def _all_demand_sentence(shifts: list[RankShift]) -> str:
     )
 
 
-def _headline(ranking: pd.DataFrame, inputs: EconomicInputs, n_draws: int) -> str:
-    best = ranking.iloc[0]
+NEVER_PAYS_BACK = "never pays back, even at $0 battery cost"
+
+
+def breakeven_label(usd_per_kw: float) -> str:
+    """Breakeven battery cost in words. Zero or negative means O&M alone exceeds savings."""
+    return NEVER_PAYS_BACK if usd_per_kw <= 0 else f"{usd(usd_per_kw)}/kW"
+
+
+def _ordinal(n: int) -> str:
+    suffix = "th" if 10 <= n % 100 <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def headline_sentence(ranking: pd.DataFrame, inputs: EconomicInputs, n_draws: int) -> str:
+    """The page's headline. Names the most robust site (rank 1, P10 NPV) and, when it differs,
+    the site closest to breaking even, so "the best site" is never ambiguous."""
+    top = ranking.sort_values("rank").iloc[0]
+    closest = ranking.iloc[int(ranking["breakeven_capex_usd_per_kw"].to_numpy().argmax())]
     capex = inputs.capex_usd_per_kw.central
     any_positive = ranking[ranking["p_npv_positive"] > 0]
-    best_breakeven = float(ranking["breakeven_capex_usd_per_kw"].max())
     if any_positive.empty:
         viable = (
             f"On demand-charge savings alone, no site pays for itself in any of the "
@@ -226,12 +242,29 @@ def _headline(ranking: pd.DataFrame, inputs: EconomicInputs, n_draws: int) -> st
             f"{'itself' if count == 1 else 'themselves'} in any of the {n_draws:,} simulated "
             f"futures, and at best in {best_count:,} of them"
         )
+    robust = (
+        f"{viable}; even the most robust site ({top['site_id']}, ranked 1st by bad-case P10 NPV) "
+        f"has a good-case (P90) NPV of {usd(top['npv_p90'])}."
+    )
+    breakeven = float(closest["breakeven_capex_usd_per_kw"])
+    if breakeven <= 0:
+        central = f" In the central case every site {NEVER_PAYS_BACK}."
+    elif closest["site_id"] == top["site_id"]:
+        central = (
+            f" In the central case it breaks even only if the battery cost about "
+            f"{breakeven_label(breakeven)}, versus {usd(capex)}/kW assumed."
+        )
+    else:
+        by_median = "best by median NPV but " if int(closest["rank_by_p50"]) == 1 else ""
+        central = (
+            f" The site closest to breaking even is a different one, {closest['site_id']} "
+            f"({by_median}ranked {_ordinal(int(closest['rank']))} on robustness): in the central "
+            f"case it breaks even only if the battery cost about {breakeven_label(breakeven)}, "
+            f"versus {usd(capex)}/kW assumed."
+        )
     return (
-        f"{viable}; even the top-ranked site ({best['site_id']}) has a good-case (P90) NPV of "
-        f"{usd(best['npv_p90'])}. In the central case the best site breaks even only if the "
-        f"battery cost about {usd(best_breakeven)}/kW, versus {usd(capex)}/kW assumed. Real "
-        "projects usually stack other revenue (for example demand-response payments), which this "
-        "model leaves out."
+        robust + central + " Real projects usually stack other revenue (for example "
+        "demand-response payments), which this model leaves out."
     )
 
 
@@ -247,8 +280,10 @@ def _revenue_sentence(ranking: pd.DataFrame, sweep: pd.DataFrame) -> str:
         else f"even {usd(float(sweep['other_revenue_usd_per_kw_year'].max()))}/kW-year is not "
         "enough for any site to clear the robustness bar (P10 NPV above zero)"
     )
+    least = ranking.iloc[int(need.to_numpy().argmin())]
     return (
-        f"To break even in the central case, the best site would need about "
+        f"To break even in the central case, the site needing the least ({least['site_id']}, "
+        f"ranked {_ordinal(int(least['rank']))} on robustness) would need about "
         f"{usd(float(need.min()))}/kW-year of other revenue on top of bill savings and half the "
         f"sites about {usd(float(need.median()))}/kW-year; {tail}. Whether any program pays that "
         "much is not assessed here."

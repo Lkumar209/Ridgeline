@@ -16,6 +16,7 @@ import pandas as pd
 from matplotlib.patches import Patch
 
 from ridgeline.config import REPO_ROOT, load_settings
+from ridgeline.ranking.pipeline import breakeven_label
 
 OUT = REPO_ROOT / "docs" / "m4"
 # Reference palette slots 1-2 (validated for color vision deficiency); labels carry identity too.
@@ -122,7 +123,7 @@ def write_results(
             "P50 NPV",
             "P90 NPV",
             "Rank by P50",
-            "Breakeven capex $/kW",
+            "Breakeven battery cost",
             "Other revenue needed $/kW-yr",
         ],
         [
@@ -135,7 +136,7 @@ def write_results(
                 _money(r["npv_p50"]),
                 _money(r["npv_p90"]),
                 r["rank_by_p50"],
-                _money(r["breakeven_capex_usd_per_kw"]),
+                breakeven_label(float(r["breakeven_capex_usd_per_kw"])),
                 _money(r["required_other_revenue_usd_per_kw_year"]),
             ]
             for _, r in ranking.head(10).iterrows()

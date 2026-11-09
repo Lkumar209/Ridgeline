@@ -64,6 +64,7 @@ All code is in `src/ridgeline/`.
 | `ranking/` | `pipeline.py` | P10 ranking, breakeven, tornado, sweeps, plain-language sentences | Sentences are generated from numbers |
 | `results.py` | `cached_savings` | Fingerprinted cache of simulated savings | See "likely to break" #3 |
 | `api/`, `web/` | `api/app.py` | FastAPI over the results files; one Leaflet page | Never recomputes |
+| `agent/` | `validators.py` | LLM tariff extraction and site explanations; validators reject anything not backed by the source; evals | Offline via `MockClient`; live needs `ANTHROPIC_API_KEY` (ADR-014) |
 | `cli.py` | — | Typer commands wiring it all together | Keep it thin |
 
 ## 4. Run, test, debug

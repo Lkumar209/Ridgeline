@@ -295,3 +295,57 @@ number as a result. The sweep shows the same information without picking a value
 - **Computing in the API:** results could disagree with `docs/m4`.
 - **40 distinct colors:** this would imply rank precision the model doesn't have.
 - **Geocoding real addresses:** there are none.
+
+## ADR-014: An LLM layer that drafts, and deterministic validators that decide (M6)
+
+**Decision.**
+- **One seam:** `agent/client.py` defines an `LLMClient` protocol with one method. Extraction and
+  explanation code never import the SDK. Live runs use `AnthropicClient`; tests and `make evals`
+  use a deterministic `MockClient`.
+- **Model and key:** the model comes from `$RIDGELINE_LLM_MODEL`, else `config/default.yaml`
+  (`agent.model`). The key comes only from `$ANTHROPIC_API_KEY`, read by the SDK; Ridgeline only
+  checks that it is set and never reads, logs or prints it. Live commands exit with code 2 and a
+  message when it is missing.
+- **Structured output for extraction:** the request carries the pydantic model's JSON schema
+  (closed objects, every field required, nullable values), so the response always parses.
+- **Every field carries evidence.** Each extracted field is `{value, confidence, evidence}`, where
+  evidence must be an exact quote. The validator rejects:
+  - a value whose quote is not in the source (after whitespace normalization);
+  - a quote that does not contain the value (rounding, percent-to-fraction and cents-to-dollars
+    allowed; spelled-out numbers like "fifteen" allowed);
+  - evidence without a value, a value without evidence, and confidence outside 0..1.
+  Low confidence is a warning for a person to review, not a rejection.
+- **Explanations are grounded in a fixed facts list** (`render_facts`), built from one row of
+  `ranking.csv`. The validator rejects any number that does not round from a number in the facts,
+  any site ID not in the facts, "best/top/worst" without a measure in the same sentence, a missing
+  site ID, and a missing caveat ("never pays back" for sites whose breakeven is ≤ $0/kW; "proxy" for
+  proxy-tariff sites). Computing new numbers (differences, ratios) is therefore rejected by design.
+- **Evals:** `agent/evals/cases.yaml` has 11 cases (6 extraction, 5 explanation). A case passes
+  only when the validator accepts the output and the output is correct. Offline, the mock returns
+  hand-written answers (labeled as such), so the evals test the harness, prompts and validators;
+  `ridgeline evals --live` scores a real model on the same expectations.
+- **Refusals:** for models that support it, requests opt into the server-side refusal fallback;
+  a refusal or truncated output raises `AgentError` instead of returning partial text.
+- **Dependency:** `anthropic` (the official SDK), imported lazily so offline code paths don't need
+  it at runtime.
+
+**Rejected.**
+- **Trusting confidence scores alone:** self-reported confidence is not evidence; the quote check
+  is what stops a guess.
+- **Letting the model compute or compare numbers in explanations:** unverifiable by a simple check,
+  and the existing sentences in `ranking/pipeline.py` already do that deterministically.
+- **An LLM judge for the evals:** the expectations here are exact values and phrases, which code
+  can check.
+- **An API endpoint or map-page integration:** it would put live-model latency and a key into the
+  read-only API (ADR-013). The CLI is enough for M6.
+- **Recording real model responses as the mock fixtures:** no key was available in the build
+  session; hand-written answers are labeled as hand-written instead of being passed off as recorded.
+
+## ADR-015: Retry only transient download failures
+
+**Decision.** `data/cache.py::download` retries connection errors, timeouts, 429 and 5xx up to
+4 attempts with waits of 2, 4 and 8 seconds, and removes the partial file between attempts. Any
+other 4xx (including a proxy's 403 for a blocked domain) fails at once.
+
+**Rejected.** Retrying every error: a blocked domain must be reported immediately (a rule from the
+brief), not after a minute of retries. A retry library: one loop is clearer than a dependency.

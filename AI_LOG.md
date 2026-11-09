@@ -257,3 +257,67 @@ it was caught. Newest milestone at the bottom.
    - the regenerated `sites.csv` and `site_locations.csv` were identical to the committed ones;
    - the ranking was byte-identical to the committed `docs/m4/ranking.csv`;
    - the API and page answered.
+
+## Clarity fixes after the user's demo (breakeven wording, "best site", layout)
+
+**Key prompt.** On the user's Mac the demo worked, with three requests:
+- show "never pays back, even at $0 battery cost" instead of a negative $/kW;
+- say which site "the best site" is when it differs from the top-ranked one;
+- tighten the empty space under the map.
+
+The user also asked to confirm "the download-retry PR from my earlier message" was included.
+
+**What was found**
+1. *There is no download-retry PR, and no earlier message about one in this session.* Checked the
+   PR list (#1–#4 only), the remote branches, and `data/cache.py` (no retry logic). I reported that
+   rather than claiming it was included or inventing one.
+2. *Two sentences used "the best site" for a site that is not the top-ranked one:* the headline
+   and the other-revenue sentence. Both meant cs-118913 (best by median NPV, 6th by P10), while
+   the page highlights cs-144167 (1st by P10). I caught the second while searching the docs for the
+   phrase after fixing the first. Both now name the site and its rank. Tests assert that the
+   ambiguous phrase is gone.
+3. *The breakeven wording lives in one Python function* (`breakeven_label`). The API serves the
+   label, so the page and the generated docs can't drift from it. An API test checks every row's
+   label against its number.
+
+## M6: LLM agent layer, and download retries
+
+**Key prompt.** "Just continue with the work ... I want the whole thing done." The remaining items
+in HANDOFF.md were M6 (spec: Anthropic SDK, model from config/env, tariff extraction with per-field
+confidence that refuses to guess, grounded site explanations, 10+ evals, a deterministic mock, a
+validator that rejects outputs inconsistent with the source) and the download retry.
+
+**What was generated**
+- `agent/` (client, numbers, tariff_extract, explain, validators, evals with 11 cases), three CLI
+  commands (`evals`, `extract-tariff`, `explain`), `make evals`, an `agent` config section,
+  ADR-014.
+- Download retries with backoff in `data/cache.py`, ADR-015.
+- 51 new tests (232 total).
+
+**What was wrong or rejected, and how it was caught**
+1. *The real G-2 text spells the interval out ("fifteen minute peak").* A digits-only number check
+   would have rejected a correct answer of 15. Caught while writing the eval case from the real
+   URDB description. The validator now also reads spelled-out numbers in evidence.
+2. *Cents read as dollars would have passed.* The first evidence check accepted a value matching
+   any number in the quote, so 7.33 (instead of 0.0733 $/kWh) from "7.33 cents per kWh" was
+   accepted. Caught while listing rejection cases for the tests. If the quote says cents, the value
+   must now be the cents figure / 100.
+3. *An explanation of P10 as "1 in 10 futures do worse" would have been rejected,* because 10 was
+   not in the facts. The system prompt asks for exactly that explanation. Caught by writing the
+   mock answers against the validator. The facts now include a one-line reading guide for
+   P10/P50/P90.
+4. *0.0125% printed as "0.01%".* The share of futures with NPV above zero lost its meaning at two
+   decimals for cs-118913. The facts now say "1 of 8,000".
+5. *The mock evals pass by construction.* Two non-vacuity tests swap one good canned answer for a
+   guess (a demand charge picked from conflicting text; an invented payback period) and assert the
+   case fails. A guard test asserts the G-2 description really lacks "14.82", so the
+   guessed-demand-charge test can't pass vacuously.
+6. *Eval facts could drift from real results.* A test rebuilds every explanation case's facts
+   from the committed `docs/m4/ranking.csv` and requires equality.
+7. *No live run.* `ANTHROPIC_API_KEY` was not set in the build session. The SDK request shape
+   (structured output, effort, refusal fallback) is tested against a fake client, and the README
+   and LIMITATIONS say the live path hasn't been exercised.
+8. *Lint caught a Unicode minus sign* typed into the number regex; it is now an explicit `−`.
+9. *Download retries:* the earlier "download-retry PR" never existed (see the previous entry).
+   Built now with a stated policy (transient errors only, so a blocked domain is still reported
+   at once), tested with an `httpx.MockTransport`.

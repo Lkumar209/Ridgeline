@@ -1,0 +1,341 @@
+# M6 eval set: 6 tariff-extraction cases and 5 site-explanation cases.
+#
+# `expected` is what a correct answer must contain. The evals score an answer only after the
+# validator has accepted it, so a case passes when the output is (1) accepted and (2) correct.
+#
+# `mock_response` is what the offline MockClient returns for the case. These are HAND-WRITTEN
+# stand-ins for a good model answer, not recordings of a real model: offline, the evals test the
+# harness, prompts and validators end to end; `ridgeline evals --live` scores a real model on the
+# same `expected` values. In extraction mock responses, fields left out mean "not stated"
+# (value null, confidence 0, evidence null).
+#
+# Sources: case `g2_urdb_description` uses the real URDB description text of the committed
+# MECo G-2 record (data/tariffs/meco_g2_sema.json). The other extraction texts are SYNTHETIC
+# snippets written for these evals; where they reuse G-2 numbers ($14.82/kW, $0.0733/kWh, $45 per
+# month) those come from the same committed record. Explanation facts are real rows of the
+# committed ranking (docs/m4/ranking.csv) for 5 sites.
+
+extraction:
+  - id: g2_urdb_description
+    about: >
+      Real URDB description of MECo G-2. It states eligibility and the billing-demand rule but no
+      prices, so every price field must be null (the refuse-to-guess test on real text).
+    urdb_description: data/tariffs/meco_g2_sema.json
+    expected:
+      max_demand_kw: 200
+      min_avg_monthly_usage_kwh: 10000
+      demand_interval_minutes: 15
+      kva_demand_fraction: 0.9
+      minimum_billing_demand_kw: 5
+      demand_charge_usd_per_kw: null
+      energy_rate_usd_per_kwh: null
+      fixed_charge_usd_per_month: null
+    mock_response:
+      max_demand_kw:
+        value: 200
+        confidence: 0.95
+        evidence: "but not exceed 200 kW of Demand"
+      min_avg_monthly_usage_kwh:
+        value: 10000
+        confidence: 0.9
+        evidence: "its average use will exceed 10,000 kWh/month"
+      demand_interval_minutes:
+        value: 15
+        confidence: 0.9
+        evidence: "The greatest fifteen minute peak"
+      kva_demand_fraction:
+        value: 0.9
+        confidence: 0.85
+        evidence: "90% of the greatest fifteen minute peak"
+      minimum_billing_demand_kw:
+        value: 5
+        confidence: 0.8
+        evidence: "c) 5 kilowatts"
+      notes:
+        - "Billing demand is the greatest of (a), (b) and (c); (b) applies above 75 kW."
+        - "1.0% discount for delivery at supply line voltage of at least 2,400 volts."
+        - "No demand, energy or customer charge amounts are stated in this text."
+
+  - id: rates_stated
+    about: Synthetic rate table with every price stated, energy given in cents.
+    text: |
+      Massachusetts Electric Company, Rate G-2 (General Service - Demand).
+      Customer Charge: $45.00 per month.
+      Distribution Demand Charge: $14.82 per kW of Demand.
+      Distribution Energy Charge: 7.33 cents per kWh.
+      Availability: customers whose average use exceeds 10,000 kWh/month, but not exceeding
+      200 kW of Demand.
+    expected:
+      utility: Massachusetts Electric Company
+      rate_name: G-2
+      fixed_charge_usd_per_month: 45
+      demand_charge_usd_per_kw: 14.82
+      energy_rate_usd_per_kwh: 0.0733
+      max_demand_kw: 200
+      min_avg_monthly_usage_kwh: 10000
+    mock_response:
+      utility:
+        value: Massachusetts Electric Company
+        confidence: 0.95
+        evidence: "Massachusetts Electric Company, Rate G-2"
+      rate_name:
+        value: G-2
+        confidence: 0.95
+        evidence: "Rate G-2 (General Service - Demand)"
+      fixed_charge_usd_per_month:
+        value: 45
+        confidence: 0.95
+        evidence: "Customer Charge: $45.00 per month."
+      demand_charge_usd_per_kw:
+        value: 14.82
+        confidence: 0.95
+        evidence: "Distribution Demand Charge: $14.82 per kW of Demand."
+      energy_rate_usd_per_kwh:
+        value: 0.0733
+        confidence: 0.9
+        evidence: "Distribution Energy Charge: 7.33 cents per kWh."
+      max_demand_kw:
+        value: 200
+        confidence: 0.85
+        evidence: "200 kW of Demand"
+      min_avg_monthly_usage_kwh:
+        value: 10000
+        confidence: 0.85
+        evidence: "average use exceeds 10,000 kWh/month"
+      notes:
+        - "Delivery (distribution) charges only; supply is billed separately."
+
+  - id: nothing_stated
+    about: >
+      Synthetic availability clause that points elsewhere for prices. Every number field must be
+      null; a model that fills in typical values fails.
+    text: |
+      Rate GS-D is available to commercial and industrial customers taking three-phase service.
+      Charges under this rate are set out in the Company's Schedule of Rates on file with the
+      Department of Public Utilities, as amended from time to time.
+    expected:
+      rate_name: GS-D
+      demand_charge_usd_per_kw: null
+      energy_rate_usd_per_kwh: null
+      fixed_charge_usd_per_month: null
+      max_demand_kw: null
+      min_avg_monthly_usage_kwh: null
+      minimum_billing_demand_kw: null
+    mock_response:
+      rate_name:
+        value: GS-D
+        confidence: 0.9
+        evidence: "Rate GS-D is available"
+      notes:
+        - "Prices are in a separate Schedule of Rates that was not provided."
+
+  - id: conflicting_demand_charge
+    about: >
+      Synthetic text that states two different demand charges without saying which applies. The
+      demand charge must be null (with the conflict noted), not either value.
+    text: |
+      Rate G-2. Demand Charge: $14.82 per kW per month.
+      Fixed Charge: $45.00 per month.
+      Summary of charges (page 4): Demand Charge $16.10 per kW per month.
+    expected:
+      rate_name: G-2
+      demand_charge_usd_per_kw: null
+      fixed_charge_usd_per_month: 45
+    mock_response:
+      rate_name:
+        value: G-2
+        confidence: 0.9
+        evidence: "Rate G-2."
+      fixed_charge_usd_per_month:
+        value: 45
+        confidence: 0.9
+        evidence: "Fixed Charge: $45.00 per month."
+      notes:
+        - "Demand charge conflict: $14.82 per kW in the rate text but $16.10 per kW in the
+          page 4 summary; the text does not say which applies."
+
+  - id: cents_energy_only
+    about: Synthetic energy-only rate; checks the cents-to-dollars conversion and null demand.
+    text: |
+      Small General Service (Rate G-1). Energy charge: 1.234 cents per kilowatt-hour for all
+      kilowatt-hours. There is no demand charge under this rate.
+    expected:
+      rate_name: G-1
+      energy_rate_usd_per_kwh: 0.01234
+      demand_charge_usd_per_kw: null
+    mock_response:
+      rate_name:
+        value: G-1
+        confidence: 0.9
+        evidence: "(Rate G-1)"
+      energy_rate_usd_per_kwh:
+        value: 0.01234
+        confidence: 0.9
+        evidence: "1.234 cents per kilowatt-hour"
+      notes:
+        - "The text says there is no demand charge; no dollar amount is given for it."
+
+  - id: kva_and_interval
+    about: Synthetic billing-demand clause with a kVA fraction and a 30-minute interval in digits.
+    text: |
+      Billing Demand shall be the greater of the highest 30-minute kW demand in the month or 85%
+      of the highest 30-minute kVA demand in the month, but not less than 25 kW.
+    expected:
+      demand_interval_minutes: 30
+      kva_demand_fraction: 0.85
+      minimum_billing_demand_kw: 25
+      demand_charge_usd_per_kw: null
+    mock_response:
+      demand_interval_minutes:
+        value: 30
+        confidence: 0.9
+        evidence: "the highest 30-minute kW demand"
+      kva_demand_fraction:
+        value: 0.85
+        confidence: 0.9
+        evidence: "85% of the highest 30-minute kVA demand"
+      minimum_billing_demand_kw:
+        value: 25
+        confidence: 0.85
+        evidence: "but not less than 25 kW"
+
+explanation:
+  - id: most_robust_proxy
+    about: Rank 1 by P10, proxy tariff, never pays back.
+    facts:
+      site_id: cs-144167
+      building_type: SecondarySchool
+      tariff_is_proxy: true
+      n_sites: 40
+      n_draws: 8000
+      life_years: 15
+      capex_usd_per_kw: 1570.371
+      rank: 1
+      rank_by_p50: 2
+      npv_p10: -217152.7199562492
+      npv_p50: -171180.32062624028
+      npv_p90: -131540.61970149013
+      p_npv_positive: 0.0
+      breakeven_capex_usd_per_kw: -26.713159500780424
+      required_other_revenue_usd_per_kw_year: 130.78673021617362
+      top_site_by_p10: cs-144167
+      top_site_by_p50: cs-118913
+    expected_mentions: ["robust"]
+    mock_response: >-
+      Site cs-144167, a secondary school, ranks 1 of 40 on robustness, meaning its bad-case
+      outcome (the P10 NPV, which only 1 in 10 simulated futures does worse than) is the least
+      bad of all sites, at about -$217k over 15 years. Its typical (median, P50) outcome is
+      -$171,180, still a loss. On demand-charge savings alone it never pays back, even at $0
+      battery cost; it would need about $131/kW-year of other revenue to break even at the
+      assumed $1,570/kW. The result rests on a proxy tariff, because the site is above the G-2
+      rate's 200 kW limit.
+
+  - id: best_median_differs
+    about: Ranked 6th by P10 but 1st by median; has a positive breakeven; proxy tariff.
+    facts:
+      site_id: cs-118913
+      building_type: RetailStripmall
+      tariff_is_proxy: true
+      n_sites: 40
+      n_draws: 8000
+      life_years: 15
+      capex_usd_per_kw: 1570.371
+      rank: 6
+      rank_by_p50: 1
+      npv_p10: -230653.48109422278
+      npv_p50: -170558.80531630042
+      npv_p90: -102051.55486958871
+      p_npv_positive: 0.000125
+      breakeven_capex_usd_per_kw: 56.14417240791286
+      required_other_revenue_usd_per_kw_year: 124.00146505008397
+      top_site_by_p10: cs-144167
+      top_site_by_p50: cs-118913
+    expected_mentions: ["median", "$56"]
+    mock_response: >-
+      Site cs-118913, a strip mall, is the best site by median (P50) NPV, about -$171k over 15
+      years, but only 6th of 40 on robustness because its bad case (P10 NPV, -$230,653) is
+      worse than that of cs-144167, the most robust site. It breaks even only if the battery
+      cost about $56/kW, against $1,570/kW assumed, and it came out ahead in just 1 of 8,000
+      simulated futures. The result rests on a proxy tariff.
+
+  - id: real_tariff_school
+    about: Real G-2 tariff (no proxy caveat needed); big gap between P10 rank and median rank.
+    facts:
+      site_id: cs-70654
+      building_type: PrimarySchool
+      tariff_is_proxy: false
+      n_sites: 40
+      n_draws: 8000
+      life_years: 15
+      capex_usd_per_kw: 1570.371
+      rank: 3
+      rank_by_p50: 10
+      npv_p10: -229944.0931461662
+      npv_p50: -186244.86306018295
+      npv_p90: -148890.3482511639
+      p_npv_positive: 0.0
+      breakeven_capex_usd_per_kw: -169.26665997298193
+      required_other_revenue_usd_per_kw_year: 142.4605710070414
+      top_site_by_p10: cs-144167
+      top_site_by_p50: cs-118913
+    expected_mentions: ["G-2"]
+    mock_response: >-
+      Site cs-70654, a primary school on the real MECo G-2 rate, ranks 3rd of 40 on robustness
+      but only 10th by median NPV: its outcomes are less spread out than most, so its bad case
+      (P10 NPV, about -$230k) holds up better than its typical case (P50, -$186,245) would
+      suggest. It never pays back on demand-charge savings, even at $0 battery cost, and would
+      need about $142/kW-year of other revenue to break even.
+
+  - id: real_tariff_outpatient
+    about: Real tariff, consistent ranks; checks the explanation stays within the facts.
+    facts:
+      site_id: cs-130562
+      building_type: Outpatient
+      tariff_is_proxy: false
+      n_sites: 40
+      n_draws: 8000
+      life_years: 15
+      capex_usd_per_kw: 1570.371
+      rank: 4
+      rank_by_p50: 6
+      npv_p10: -230203.3319900791
+      npv_p50: -183628.7166033733
+      npv_p90: -142802.18865287246
+      p_npv_positive: 0.0
+      breakeven_capex_usd_per_kw: -132.57347616631395
+      required_other_revenue_usd_per_kw_year: 139.45573152958067
+      top_site_by_p10: cs-144167
+      top_site_by_p50: cs-118913
+    expected_mentions: []
+    mock_response: >-
+      Site cs-130562, an outpatient clinic, ranks 4th of 40 by bad-case (P10) NPV and 6th by
+      median NPV. In a bad-case future it loses about $230k over 15 years and in a typical one
+      about $184k, and none of the 8,000 simulated futures came out ahead. It never pays back
+      on demand-charge savings alone, even at $0 battery cost.
+
+  - id: last_place
+    about: Ranked 40 of 40 on both measures; "worst" must name its measure.
+    facts:
+      site_id: cs-60587
+      building_type: FullServiceRestaurant
+      tariff_is_proxy: true
+      n_sites: 40
+      n_draws: 8000
+      life_years: 15
+      capex_usd_per_kw: 1570.371
+      rank: 40
+      rank_by_p50: 40
+      npv_p10: -253172.94158115998
+      npv_p50: -208907.82334586547
+      npv_p90: -172603.59051144336
+      p_npv_positive: 0.0
+      breakeven_capex_usd_per_kw: -380.97536759945626
+      required_other_revenue_usd_per_kw_year: 159.79759702664293
+      top_site_by_p10: cs-144167
+      top_site_by_p50: cs-118913
+    expected_mentions: ["40"]
+    mock_response: >-
+      Site cs-60587, a full-service restaurant, is the worst of the 40 sites by both bad-case
+      (P10) and median (P50) NPV, at about -$253k and -$209k over 15 years. It never pays back
+      on demand-charge savings, even at $0 battery cost, and would need about $160/kW-year of
+      other revenue to break even. Its result also rests on a proxy tariff.

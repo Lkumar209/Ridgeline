@@ -7,16 +7,20 @@ buildings it:
    demand-charge tariff (MECo G-2);
 2. runs a 15-year Monte Carlo cash-flow model;
 3. ranks sites by their bad-case (P10) NPV, with breakeven battery cost alongside;
-4. explains in plain sentences what moves the ranking.
+4. explains in plain sentences what moves the ranking;
+5. optionally uses an LLM to extract tariff parameters from text and to explain a site, with every
+   output checked against its source before it is shown (M6).
 
 > **All outputs are illustrative.** This is a personal project inspired by a real problem, not
 > anyone's production model. Every number about the world is in `assumptions.yaml` with a source
 > URL or the label `ASSUMPTION`.
 
 **Current finding:** on demand-charge savings alone, no site pays back at NREL ATB 2026 battery
-costs. The best site breaks even at about $56/kW, and needs about $124/kW-year of other revenue
-(for example demand-response payments, not modeled) to break even. The ranking shows where a
-battery loses least, most reliably. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
+costs (about $1,570/kW). Even a far cheaper battery would only help one site: cs-118913 (best by
+median NPV) breaks even in the central case if the battery cost about $56/kW, and needs about
+$124/kW-year of other revenue (for example demand-response payments, not modeled) at today's
+cost. The other 39 never pay back, even at $0 battery cost. The ranking shows where a battery loses
+least, most reliably. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
 
 ![Map page](docs/m5/map_page.png)
 
@@ -57,6 +61,9 @@ GitHub Actions runs the same `make check` on every push and pull request.
 | `uv run ridgeline rank [--dev-subset] [--draws N] [--resimulate]` | 15-year Monte Carlo, robustness ranking, sensitivity, plain-language explanations |
 | `uv run ridgeline serve` | FastAPI on http://127.0.0.1:8000: `/api/sites`, `/api/rankings`, `/api/sites/{id}`, and the map page |
 | `uv run python scripts/report_ranking.py` | Regenerate `docs/m4/` from the latest `rank` run |
+| `uv run ridgeline evals [--live]` | M6 eval set (11 cases): offline against a mock client, or a real model with `--live` |
+| `uv run ridgeline extract-tariff FILE` | LLM tariff extraction with per-field confidence and quoted evidence (needs `ANTHROPIC_API_KEY`) |
+| `uv run ridgeline explain SITE_ID` | LLM plain-language explanation of one site, grounded in `rank` outputs (needs `ANTHROPIC_API_KEY`) |
 
 ## Repo map
 
@@ -68,6 +75,7 @@ GitHub Actions runs the same `make check` on every push and pull request.
 | `src/ridgeline/scenarios/` | 15-year cash flow and Monte Carlo (M4) |
 | `src/ridgeline/ranking/` | P10 ranking, breakeven, tornado, scenario sweeps, plain-language sentences (M4) |
 | `src/ridgeline/api/`, `src/ridgeline/web/` | FastAPI app and the single Leaflet page (M5) |
+| `src/ridgeline/agent/` | LLM client (Anthropic + mock), tariff extraction, explanations, validators, evals (M6) |
 | `src/ridgeline/results.py` | Fingerprinted cache of simulated savings |
 | `src/ridgeline/cli.py`, `config.py`, `assumptions.py` | CLI, run settings, sourced assumptions |
 | `config/default.yaml`, `assumptions.yaml` | How to run; facts and ranges about the world |
@@ -92,4 +100,6 @@ GitHub Actions runs the same `make check` on every push and pull request.
 
 ## Status
 
-M0–M5 and M7 are done. M6 (the LLM agent layer) is not built.
+M0–M7 are done. The M6 agent layer is tested offline (mock client, 11 evals); its live path was
+not run while it was built, because no API key was available. To try it, set `ANTHROPIC_API_KEY`
+(and optionally `RIDGELINE_LLM_MODEL`) and run `uv run ridgeline evals --live`.

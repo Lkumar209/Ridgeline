@@ -5,8 +5,8 @@ All values illustrative; real 2025 dollars.
 
 ## In plain language
 
-- **Headline.** On demand-charge savings alone, only 1 of 40 sites pays for itself in any of the 8,000 simulated futures, and at best in 1 of them; even the top-ranked site (cs-144167) has a good-case (P90) NPV of -$131,541. In the central case the best site breaks even only if the battery cost about $56/kW, versus $1,570/kW assumed. Real projects usually stack other revenue (for example demand-response payments), which this model leaves out.
-- **Other revenue.** To break even in the central case, the best site would need about $124/kW-year of other revenue on top of bill savings and half the sites about $147/kW-year; at $200/kW-year, 31 of 40 sites clear the robustness bar (P10 NPV above zero). Whether any program pays that much is not assessed here.
+- **Headline.** On demand-charge savings alone, only 1 of 40 sites pays for itself in any of the 8,000 simulated futures, and at best in 1 of them; even the most robust site (cs-144167, ranked 1st by bad-case P10 NPV) has a good-case (P90) NPV of -$131,541. The site closest to breaking even is a different one, cs-118913 (best by median NPV but ranked 6th on robustness): in the central case it breaks even only if the battery cost about $56/kW, versus $1,570/kW assumed. Real projects usually stack other revenue (for example demand-response payments), which this model leaves out.
+- **Other revenue.** To break even in the central case, the site needing the least (cs-118913, ranked 6th on robustness) would need about $124/kW-year of other revenue on top of bill savings and half the sites about $147/kW-year; at $200/kW-year, 31 of 40 sites clear the robustness bar (P10 NPV above zero). Whether any program pays that much is not assessed here.
 - **Closeness.** The sites are close together: neighbours in the ranking differ by a median $329 of bad-case value, so small input changes can swap neighbours without changing the overall picture.
 - **Rank stability.** Re-running with a different random seed moves no site more than 4 places, so treat sites within 4 places of each other as tied; below, a site only counts as moved if it shifts 5 or more places.
 - **Proxy tariff.** If the stand-in tariff used for the 23 large sites is off by 30% either way, the order changes substantially: at most 15 of 40 sites move 5 or more places, and at least 7 of the top 10 stay in the top 10.
@@ -15,18 +15,18 @@ All values illustrative; real 2025 dollars.
 
 ## Top 10 by robustness (P10 NPV)
 
-| Rank | Site | Type | Proxy tariff | P10 NPV | P50 NPV | P90 NPV | Rank by P50 | Breakeven capex $/kW | Other revenue needed $/kW-yr |
+| Rank | Site | Type | Proxy tariff | P10 NPV | P50 NPV | P90 NPV | Rank by P50 | Breakeven battery cost | Other revenue needed $/kW-yr |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | cs-144167 | SecondarySchool | yes | -$217,153 | -$171,180 | -$131,541 | 2 | -$27 | $131 |
-| 2 | cs-106921 | SecondarySchool | yes | -$221,490 | -$176,928 | -$138,398 | 3 | -$83 | $135 |
-| 3 | cs-70654 | PrimarySchool | no | -$229,944 | -$186,245 | -$148,890 | 10 | -$169 | $142 |
-| 4 | cs-130562 | Outpatient | no | -$230,203 | -$183,629 | -$142,802 | 6 | -$133 | $139 |
-| 5 | cs-18182 | SecondarySchool | yes | -$230,536 | -$186,656 | -$148,742 | 11 | -$172 | $143 |
-| 6 | cs-118913 | RetailStripmall | yes | -$230,653 | -$170,559 | -$102,052 | 1 | $56 | $124 |
-| 7 | cs-130568 | Outpatient | yes | -$231,027 | -$182,210 | -$139,163 | 4 | -$116 | $138 |
-| 8 | cs-35218 | PrimarySchool | yes | -$231,275 | -$187,156 | -$149,324 | 13 | -$179 | $143 |
-| 9 | cs-108896 | Outpatient | yes | -$231,916 | -$183,577 | -$141,287 | 5 | -$129 | $139 |
-| 10 | cs-98720 | Outpatient | no | -$234,054 | -$187,130 | -$148,594 | 12 | -$174 | $143 |
+| 1 | cs-144167 | SecondarySchool | yes | -$217,153 | -$171,180 | -$131,541 | 2 | never pays back, even at $0 battery cost | $131 |
+| 2 | cs-106921 | SecondarySchool | yes | -$221,490 | -$176,928 | -$138,398 | 3 | never pays back, even at $0 battery cost | $135 |
+| 3 | cs-70654 | PrimarySchool | no | -$229,944 | -$186,245 | -$148,890 | 10 | never pays back, even at $0 battery cost | $142 |
+| 4 | cs-130562 | Outpatient | no | -$230,203 | -$183,629 | -$142,802 | 6 | never pays back, even at $0 battery cost | $139 |
+| 5 | cs-18182 | SecondarySchool | yes | -$230,536 | -$186,656 | -$148,742 | 11 | never pays back, even at $0 battery cost | $143 |
+| 6 | cs-118913 | RetailStripmall | yes | -$230,653 | -$170,559 | -$102,052 | 1 | $56/kW | $124 |
+| 7 | cs-130568 | Outpatient | yes | -$231,027 | -$182,210 | -$139,163 | 4 | never pays back, even at $0 battery cost | $138 |
+| 8 | cs-35218 | PrimarySchool | yes | -$231,275 | -$187,156 | -$149,324 | 13 | never pays back, even at $0 battery cost | $143 |
+| 9 | cs-108896 | Outpatient | yes | -$231,916 | -$183,577 | -$141,287 | 5 | never pays back, even at $0 battery cost | $139 |
+| 10 | cs-98720 | Outpatient | no | -$234,054 | -$187,130 | -$148,594 | 12 | never pays back, even at $0 battery cost | $143 |
 
 Full table: [`ranking.csv`](ranking.csv).
 
