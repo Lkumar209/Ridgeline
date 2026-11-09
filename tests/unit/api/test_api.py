@@ -33,7 +33,10 @@ def _site(economics_site_id: str, bldg_id: int, btype: str) -> Site:
 
 @pytest.fixture(scope="module")
 def api_data() -> ApiData:
-    economics = five_sites()
+    tariff_ids = ["T-G2", "T-G2", "T-G3", "T-G3", "T-G2"]
+    economics = [
+        e.model_copy(update={"tariff_id": t}) for e, t in zip(five_sites(), tariff_ids, strict=True)
+    ]
     result = rank_sites(economics, inputs(), n_draws=300, seed=1)
     sites = {e.site_id: _site(e.site_id, e.bldg_id, e.building_type) for e in economics}
     locations = pd.DataFrame(
@@ -54,6 +57,7 @@ def api_data() -> ApiData:
         explanations=result.explanations,
         run={"n_draws": 300, "seed": 1, "seconds": 0.1},
         daily_load=lambda site: daily_load(load),
+        tariff_names={"T-G2": "G-2 Demand (test)", "T-G3": "G-3 Time of Use (test)"},
     )
 
 
@@ -135,3 +139,15 @@ def test_breakeven_label_is_served_and_matches_the_number(client: TestClient) ->
             assert label.endswith("/kW") and not label.startswith("-")
     detail = client.get(f"/api/sites/{sites[0]['site_id']}").json()
     assert detail["ranking"]["breakeven_label"] == detail["site"]["breakeven_label"]
+
+
+def test_sites_name_their_tariff(client: TestClient, api_data: ApiData) -> None:
+    """Regression: the page labelled every non-proxy site 'MECo G-2', including G-3 sites."""
+    by_id = {s["site_id"]: s for s in client.get("/api/sites").json()}
+    for site_id, row in api_data.ranking.iterrows():
+        expected = api_data.tariff_names[row["tariff_id"]]
+        if row["tariff_is_proxy"]:
+            expected += " (values used as a proxy)"
+        assert by_id[site_id]["tariff"] == expected
+    assert any("G-3" in s["tariff"] for s in by_id.values())
+    assert any("proxy" in s["tariff"] for s in by_id.values())

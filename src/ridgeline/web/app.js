@@ -154,7 +154,7 @@ async function showSite(siteId) {
   panel.innerHTML = `
     <h2>${d.site.site_id} · ${d.site.building_type}</h2>
     <div class="note">${d.site.county_name} · peak ${Math.round(d.site.peak_kw)} kW ·
-      ${d.site.tariff_is_proxy ? "tariff: G-2 values used as a proxy (above 200 kW)" : "tariff: MECo G-2"}</div>
+      tariff: ${d.site.tariff}</div>
     <div class="stats">
       ${stat("Robustness rank", `${r.rank} (by median: ${r.rank_by_p50})`)}
       ${stat("Breakeven battery cost", r.breakeven_label)}
@@ -195,7 +195,8 @@ async function main() {
     const [rankings, sites] = await Promise.all([getJson("/api/rankings"), getJson("/api/sites")]);
     document.getElementById("headline").textContent = rankings.explanations.headline;
     const labels = { other_revenue: "Other revenue", proxy_tariff: "If the proxy tariff is wrong",
-      tenant_churn: "Tenant churn", rank_stability: "How precise ranks are" };
+      all_demand: "If demand charges change", tenant_churn: "Tenant churn",
+      rank_stability: "How precise ranks are" };
     document.getElementById("explanations").innerHTML = Object.entries(labels)
       .filter(([k]) => rankings.explanations[k])
       .map(([k, label]) => `<li><b>${label}.</b> ${rankings.explanations[k]}</li>`).join("");

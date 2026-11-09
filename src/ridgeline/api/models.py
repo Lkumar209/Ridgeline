@@ -20,6 +20,7 @@ class SiteSummary(_Out):
     building_type: str
     county_name: str
     peak_kw: float
+    tariff: str
     tariff_is_proxy: bool
     rank: int
     breakeven_capex_usd_per_kw: float

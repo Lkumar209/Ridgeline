@@ -8,16 +8,18 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
 
+from ridgeline.assumptions import load_assumptions
 from ridgeline.config import Settings
 from ridgeline.data.comstock import load_cached_timeseries
 from ridgeline.data.locations import read_locations
 from ridgeline.data.schemas import LOCAL_TZ, Site
 from ridgeline.data.sites import read_sites
+from ridgeline.data.tariffs import load_tariff_dir, with_proxies
 
 RESULT_FILES = ("ranking.csv", "fan.csv", "explanations.json", "revenue_sweep.csv")
 
@@ -36,6 +38,7 @@ class ApiData:
     explanations: dict[str, str]
     run: dict[str, float | int]
     daily_load: Callable[[Site], pd.DataFrame]  # date, peak_kw, mean_kw (empty if no data)
+    tariff_names: dict[str, str] = field(default_factory=dict)  # tariff_id -> tariff name
 
 
 def daily_load(series: pd.Series) -> pd.DataFrame:
@@ -65,6 +68,13 @@ def load_api_data(settings: Settings) -> ApiData:
         return daily_load(load_cached_timeseries(path))
 
     sites = read_sites(settings.resolve(settings.paths.sites_file))
+    tariffs = with_proxies(
+        load_tariff_dir(
+            settings.resolve(settings.paths.tariffs_dir),
+            load_assumptions()["power_factor_for_kva_demand"].number,
+        ),
+        settings.tariff_proxies,
+    )
     return ApiData(
         sites={s.site_id: s for s in sites},
         locations=read_locations(Path(settings.resolve(settings.paths.locations_file))).set_index(
@@ -76,4 +86,5 @@ def load_api_data(settings: Settings) -> ApiData:
         explanations=info["explanations"],
         run=info["run"],
         daily_load=site_daily_load,
+        tariff_names={t.tariff_id: t.name for t in tariffs},
     )
