@@ -84,6 +84,23 @@ list grows each milestone.
   needs a restart.
 - **The page needs the internet** for the Leaflet library and OpenStreetMap tiles. Tests don't.
 - **No auth, no database, local use only.**
+- **Downloads retry transient failures** (4 attempts; 2, 4, 8 s waits). A run that keeps
+  failing still stops with the URL and the error.
+
+## LLM agent layer (M6)
+- **Not run against a live model while it was built.** No API key was available in that session.
+  The offline evals use hand-written answers, so they test the harness, prompts and validators,
+  not model quality. Run `uv run ridgeline evals --live` with a key to score a real model.
+- **The validators check grounding, not truth.** An extracted value can be correctly quoted from a
+  tariff that is itself outdated or for the wrong rate; a quoted number can sit in the right
+  sentence but belong to a different charge. Review flagged fields and the evidence quotes.
+- **Number matching is lexical.** A number in an explanation passes if it rounds from any number
+  in the facts, not necessarily the right one. Signs are ignored ("loses $217k" and "-$217k" both
+  match). Spelled-out numbers are recognized in tariff text but not in explanations.
+- **Small eval set.** 11 cases, mostly synthetic snippets; one real tariff text (G-2's URDB
+  description). It shows the method, not a measured accuracy.
+- **Extraction covers flat demand tariffs only.** Time-of-use windows, seasonal rates and ratchets
+  have no fields yet; such text ends up in notes.
 
 ## MECo G-2 tariff (`data/tariffs/meco_g2_sema.json`)
 - **Delivery service only.** The record's `servicetype` is Delivery. Supply (basic service) energy

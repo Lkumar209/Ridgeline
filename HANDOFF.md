@@ -14,22 +14,23 @@ state, results, gotchas, and what is left. Read it top to bottom once. After tha
   value. Personal portfolio project, walked through with an interviewer. All outputs are
   **illustrative**.
 - **Repo:** https://github.com/Lkumar209/Ridgeline (owner `Lkumar209`, the user Laxya Kumar).
-- **Done:** M0, M1, M2, M3, M4, M5, M7, plus follow-ups. CI is green.
-- **Not done:** M6, the LLM agent layer. The user said "M6 comes last and only if time allows."
-- **Open PR:** **#5** ("Clarity fixes: 'never pays back' wording, name the site meant, tighter map
-  layout"). It is green and mergeable, waiting for the user to merge. This handoff file is committed
-  on the same branch, so it is part of PR #5.
+- **Done:** M0–M7, plus follow-ups and download retries. CI is green.
+- **M6 (LLM agent layer) is built and tested offline** (mock client, 11 evals, ADR-014). Its live
+  path has **not** been run: no `ANTHROPIC_API_KEY` was available. First live step: set the key and
+  run `uv run ridgeline evals --live`.
+- **Open PR:** **#5**. It holds the clarity fixes, this handoff, download retries and M6, all on
+  branch `claude/dazzling-cori-pty3ol`, waiting for the user to merge.
 - **Headline finding:** on demand-charge savings alone, no site pays back at NREL ATB 2026
   battery costs (~$1,570/kW). Only cs-118913 would break even in the central case, at a hypothetical
   ~$56/kW battery. The other 39 never pay back, even at $0 battery cost (savings < fixed O&M ~$4.7k/yr).
 - **Quickstart:** `git clone … && cd Ridgeline`, then `uv sync`, then `make demo` (fetch ~30 s,
-  rank ~35 s first time, then serves http://127.0.0.1:8000). `make check` is offline: 181 tests,
-  ruff, `mypy --strict`.
+  rank ~35 s first time, then serves http://127.0.0.1:8000). `make check` is offline: 232 tests,
+  ruff, `mypy --strict`. `make evals` runs the M6 evals offline.
 
 ### Suggested opening message for the next chat
 
 > Read HANDOFF.md, ONBOARDING.md and DECISIONS.md in the Ridgeline repo. Check whether PR #5 is
-> merged. Then [continue with M6 / do X]. Follow the working rules in HANDOFF.md section 3.
+> merged. Then [run the M6 live evals with my key / do X]. Follow the working rules in HANDOFF.md section 3.
 
 ---
 
@@ -70,7 +71,8 @@ communication. A new teammate must be able to add a feature after reading README
 
 ### Architecture (modules under `src/ridgeline/`)
 `data/`, `gaps/`, `battery/`, `scenarios/`, `ranking/`, `agent/` (M6), `api/`, `web/`, `cli.py`
-with commands `fetch-data`, `simulate`, `rank`, `serve`. All exist except `agent/`.
+with commands `fetch-data`, `simulate`, `rank`, `serve`. All exist; M6 added `evals`,
+`extract-tariff` and `explain`.
 
 ### Milestones (in order; ask before skipping or reordering)
 - **M0** data feasibility spike (ComStock on OEDI S3; URDB API). **Done.**
@@ -79,7 +81,7 @@ with commands `fetch-data`, `simulate`, `rank`, `serve`. All exist except `agent
 - **M3** threshold controller, bill calculator, perfect-foresight LP bound, property tests. **Done.**
 - **M4** 15-yr Monte Carlo, P10/P50/P90, P(NPV>0), robustness score, tornado, churn. **Done.**
 - **M5** API and map UI. **Done.**
-- **M6** agent layer with the Anthropic SDK. **NOT DONE**; full spec in §9.
+- **M6** agent layer with the Anthropic SDK. **Done offline** (live path untested; no key); §9.
 - **M7** hardening and docs: fresh-clone test, README, ONBOARDING, architecture diagram,
   limitations. **Done.**
 
@@ -115,14 +117,14 @@ All of this is met.
 | PR #2 | M3. Merged. |
 | PR #3 | M4 (+ CI workflow, M2 refresh). Merged. |
 | PR #4 | M4 follow-up + M5 + M7. Merged. |
-| **PR #5** | **Open, green, mergeable.** 2 commits (`75a6730`, `14dca5f`) plus this HANDOFF.md commit. |
+| **PR #5** | **Open.** Clarity fixes (`75a6730`, `14dca5f`), HANDOFF.md, download retries, M6. |
 | CI | `.github/workflows/check.yml`: `uv sync --locked` then `make check` on every push and PR. Offline. Green. |
-| Tests | 181 (unit, property, golden, e2e, api). |
+| Tests | 232 (unit, property, golden, e2e, api, agent). |
 | Tracked files | ~125. Code is ~3,700 lines of Python in `src/`. |
 
-**There is no "download-retry PR".** The user once asked to confirm one was included. It never
-existed in this session (only PRs #1–#5), and `data/cache.py` has no retry logic. If the user wants
-it, see §8.
+**Download retries** now exist (ADR-015): `data/cache.py` retries connection errors, timeouts,
+429 and 5xx (4 attempts; 2, 4, 8 s), and fails at once on other 4xx. The earlier
+"download-retry PR" the user asked about never existed; this was built afterwards.
 
 ---
 
@@ -454,8 +456,8 @@ make demo           # fetch + rank + serve (http://127.0.0.1:8000)
 ## 8. Open items and remaining work (prioritized)
 
 1. **Merge PR #5** (user action), then restart the branch from `origin/main`.
-2. **M6 agent layer** (brief spec + suggested design in §9). The user said only if time allows;
-   confirm with the user before starting.
+2. **M6 live check** (built; see §9). Needs the user's `ANTHROPIC_API_KEY`. Run
+   `uv run ridgeline evals --live`, fix prompts if cases fail, and record results in AI_LOG.
 3. **A real MECo G-3 tariff for sites above 200 kW** (the user was searching). When it arrives:
    - save it verbatim to `data/tariffs/`;
    - add a data-contract test like `test_committed_meco_g2_matches_its_published_values`;
@@ -469,10 +471,10 @@ make demo           # fetch + rank + serve (http://127.0.0.1:8000)
    - **B. G-3 tariff:** as item 3.
    - **C. A revenue-stacking scenario:** add a sourced or ASSUMPTION `other_revenue` term to
      `Draws`; never a guessed amount presented as real.
-5. **Download retry** (only if the user wants it). No such PR ever existed. Small change: retries
-   with exponential backoff in `data/cache.py::download` on connection errors and 5xx, not on 4xx.
-   Add a unit test with a mocked `httpx` transport. Ask the user for the attempt count and policy.
-6. **Docs to refresh after any of the above:** README "Status" (still says M6 not built), AI_LOG
+5. **Download retry: done** (ADR-015). The policy (4 attempts, 2/4/8 s, transient errors only)
+   was chosen without asking; change `ATTEMPTS`/`BACKOFF_S` in `data/cache.py` if the user wants
+   another.
+6. **Docs to refresh after any of the above:** README "Status", AI_LOG
    (new entry per milestone), DECISIONS (new ADR), LIMITATIONS, and `docs/m4/` (regenerated).
 
 **Future work noted but not requested** (don't build unless asked):
@@ -486,7 +488,12 @@ make demo           # fetch + rank + serve (http://127.0.0.1:8000)
 
 ---
 
-## 9. M6 spec (from the brief) and a suggested design
+## 9. M6 spec (from the brief) and the design that was built
+
+**Status:** built as described below (ADR-014; LIMITATIONS "LLM agent layer"; AI_LOG "M6"). Where
+the build differs from this plan: one `LLMRequest` (system, user, optional JSON schema) instead of
+messages/tools; `numbers.py` holds the number matching; evals live in
+`src/ridgeline/agent/evals/` and run with `ridgeline evals` / `make evals`; no API endpoint.
 
 **Brief:** an agent layer using the Anthropic SDK, with the model name from config/env, and two
 functions:

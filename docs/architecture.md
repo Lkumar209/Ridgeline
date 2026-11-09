@@ -46,6 +46,14 @@ flowchart LR
     LOCS --> API
     LOADS --> API
     API --> WEB
+
+    subgraph agent["ridgeline evals / extract-tariff / explain (M6)"]
+        LLM["agent/<br/>LLM client (Anthropic or mock)"]
+        VAL["agent/validators.py<br/>reject ungrounded output"]
+    end
+    TXT[("tariff text")] --> LLM
+    RES --> LLM
+    LLM --> VAL
 ```
 
 `results/` is `data/cache/results/` (gitignored). `docs/m4/` holds a committed copy for readers.
@@ -54,7 +62,8 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    cli["cli.py"] --> data & battery & ranking & api
+    cli["cli.py"] --> data & battery & ranking & api & agent
+    agent["agent/"] --> ranking
     api["api/"] --> data
     ranking["ranking/"] --> scenarios
     scenarios["scenarios/"] --> assumptions
@@ -66,7 +75,8 @@ flowchart TB
     assumptions["assumptions.py"]
 ```
 
-Arrows point from a module to what it imports. Nothing imports `cli.py` or `api/`. The core
+Arrows point from a module to what it imports. Nothing imports `cli.py`, `api/` or `agent/`;
+`agent/` imports the Anthropic SDK only inside `AnthropicClient`. The core
 (`battery/`, `scenarios/`, `ranking/`) is pure functions over numpy and pandas plus pydantic models:
 no network and no file I/O. I/O lives in `data/`, `results.py`, `api/data.py` and `cli.py`.
 
@@ -80,3 +90,4 @@ no network and no file I/O. I/O lives in `data/`, `results.py`, `api/data.py` an
 | Simulation → Monte Carlo | Savings table, cached under a fingerprint of all its inputs | `results.py` |
 | Monte Carlo → web | CSV and JSON files written by `rank`; API never recomputes | `api/data.py` |
 | API → page | Pydantic response models | `api/models.py` |
+| LLM → anything shown | Structured output schema; every value quoted from the source, every number from the facts | `agent/validators.py` (ADR-014) |
