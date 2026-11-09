@@ -13,7 +13,8 @@
 # MECo G-2 record (data/tariffs/meco_g2_sema.json). The other extraction texts are SYNTHETIC
 # snippets written for these evals; where they reuse G-2 numbers ($14.82/kW, $0.0733/kWh, $45 per
 # month) those come from the same committed record. Explanation facts are real rows of the
-# committed ranking (docs/m4/ranking.csv) for 5 sites.
+# committed ranking (docs/m4/ranking.csv) for 5 sites. No site uses a proxy tariff since
+# ADR-016, so the proxy caveat is covered by unit tests (tests/unit/agent/test_validators.py), not here.
 
 extraction:
   - id: g2_urdb_description
@@ -206,142 +207,145 @@ extraction:
         evidence: "but not less than 25 kW"
 
 explanation:
-  - id: most_robust_proxy
-    about: Rank 1 by P10, proxy tariff, never pays back.
-    facts:
-      site_id: cs-144167
-      building_type: SecondarySchool
-      tariff_is_proxy: true
-      n_sites: 40
-      n_draws: 8000
-      life_years: 15
-      capex_usd_per_kw: 1570.371
-      rank: 1
-      rank_by_p50: 2
-      npv_p10: -217152.7199562492
-      npv_p50: -171180.32062624028
-      npv_p90: -131540.61970149013
-      p_npv_positive: 0.0
-      breakeven_capex_usd_per_kw: -26.713159500780424
-      required_other_revenue_usd_per_kw_year: 130.78673021617362
-      top_site_by_p10: cs-144167
-      top_site_by_p50: cs-118913
-    expected_mentions: ["P10"]
-    mock_response: >-
-      Site cs-144167, a secondary school, ranks 1 of 40 on robustness, meaning its bad-case
-      outcome (the P10 NPV, which only 1 in 10 simulated futures does worse than) is the least
-      bad of all sites, at about -$217k over 15 years. Its typical (median, P50) outcome is
-      -$171,180, still a loss. On demand-charge savings alone it never pays back, even at $0
-      battery cost; it would need about $131/kW-year of other revenue to break even at the
-      assumed $1,570/kW. The result rests on a proxy tariff, because the site is above the G-2
-      rate's 200 kW limit.
-
-  - id: best_median_differs
-    about: Ranked 6th by P10 but 1st by median; has a positive breakeven; proxy tariff.
-    facts:
-      site_id: cs-118913
-      building_type: RetailStripmall
-      tariff_is_proxy: true
-      n_sites: 40
-      n_draws: 8000
-      life_years: 15
-      capex_usd_per_kw: 1570.371
-      rank: 6
-      rank_by_p50: 1
-      npv_p10: -230653.48109422278
-      npv_p50: -170558.80531630042
-      npv_p90: -102051.55486958871
-      p_npv_positive: 0.000125
-      breakeven_capex_usd_per_kw: 56.14417240791286
-      required_other_revenue_usd_per_kw_year: 124.00146505008397
-      top_site_by_p10: cs-144167
-      top_site_by_p50: cs-118913
-    expected_mentions: ["median", "$56"]
-    mock_response: >-
-      Site cs-118913, a strip mall, is the best site by median (P50) NPV, about -$171k over 15
-      years, but only 6th of 40 on robustness because its bad case (P10 NPV, -$230,653) is
-      worse than that of cs-144167, the most robust site. It breaks even only if the battery
-      cost about $56/kW, against $1,570/kW assumed, and it came out ahead in just 1 of 8,000
-      simulated futures. The result rests on a proxy tariff.
-
-  - id: real_tariff_school
-    about: Real G-2 tariff (no proxy caveat needed); big gap between P10 rank and median rank.
-    facts:
-      site_id: cs-70654
-      building_type: PrimarySchool
-      tariff_is_proxy: false
-      n_sites: 40
-      n_draws: 8000
-      life_years: 15
-      capex_usd_per_kw: 1570.371
-      rank: 3
-      rank_by_p50: 10
-      npv_p10: -229944.0931461662
-      npv_p50: -186244.86306018295
-      npv_p90: -148890.3482511639
-      p_npv_positive: 0.0
-      breakeven_capex_usd_per_kw: -169.26665997298193
-      required_other_revenue_usd_per_kw_year: 142.4605710070414
-      top_site_by_p10: cs-144167
-      top_site_by_p50: cs-118913
-    expected_mentions: ["G-2"]
-    mock_response: >-
-      Site cs-70654, a primary school on the real MECo G-2 rate, ranks 3rd of 40 on robustness
-      but only 10th by median NPV: its outcomes are less spread out than most, so its bad case
-      (P10 NPV, about -$230k) holds up better than its typical case (P50, -$186,245) would
-      suggest. It never pays back on demand-charge savings, even at $0 battery cost, and would
-      need about $142/kW-year of other revenue to break even.
-
-  - id: real_tariff_outpatient
-    about: Real tariff, consistent ranks; checks the explanation stays within the facts.
-    facts:
-      site_id: cs-130562
-      building_type: Outpatient
-      tariff_is_proxy: false
-      n_sites: 40
-      n_draws: 8000
-      life_years: 15
-      capex_usd_per_kw: 1570.371
-      rank: 4
-      rank_by_p50: 6
-      npv_p10: -230203.3319900791
-      npv_p50: -183628.7166033733
-      npv_p90: -142802.18865287246
-      p_npv_positive: 0.0
-      breakeven_capex_usd_per_kw: -132.57347616631395
-      required_other_revenue_usd_per_kw_year: 139.45573152958067
-      top_site_by_p10: cs-144167
-      top_site_by_p50: cs-118913
-    expected_mentions: []
-    mock_response: >-
-      Site cs-130562, an outpatient clinic, ranks 4th of 40 by bad-case (P10) NPV and 6th by
-      median NPV. In a bad-case future it loses about $230k over 15 years and in a typical one
-      about $184k, and none of the 8,000 simulated futures came out ahead. It never pays back
-      on demand-charge savings alone, even at $0 battery cost.
-
-  - id: last_place
-    about: Ranked 40 of 40 on both measures; "worst" must name its measure.
-    facts:
-      site_id: cs-60587
-      building_type: FullServiceRestaurant
-      tariff_is_proxy: true
-      n_sites: 40
-      n_draws: 8000
-      life_years: 15
-      capex_usd_per_kw: 1570.371
-      rank: 40
-      rank_by_p50: 40
-      npv_p10: -253172.94158115998
-      npv_p50: -208907.82334586547
-      npv_p90: -172603.59051144336
-      p_npv_positive: 0.0
-      breakeven_capex_usd_per_kw: -380.97536759945626
-      required_other_revenue_usd_per_kw_year: 159.79759702664293
-      top_site_by_p10: cs-144167
-      top_site_by_p50: cs-118913
-    expected_mentions: ["40"]
-    mock_response: >-
-      Site cs-60587, a full-service restaurant, is the worst of the 40 sites by both bad-case
-      (P10) and median (P50) NPV, at about -$253k and -$209k over 15 years. It never pays back
-      on demand-charge savings, even at $0 battery cost, and would need about $160/kW-year of
-      other revenue to break even. Its result also rests on a proxy tariff.
+- id: most_robust
+  about: Rank 1 by P10 on the real G-2 tariff; only 3rd by median.
+  facts:
+    site_id: cs-70654
+    building_type: PrimarySchool
+    tariff_name: Massachusetts Electric Co G-2 Demand SEMA Load Zone
+    tariff_is_proxy: false
+    n_sites: 40
+    n_draws: 8000
+    life_years: 15
+    capex_usd_per_kw: 1570.371
+    rank: 1
+    rank_by_p50: 3
+    npv_p10: -229944.0931461662
+    npv_p50: -186244.86306018295
+    npv_p90: -148890.3482511639
+    p_npv_positive: 0.0
+    breakeven_capex_usd_per_kw: -169.26665997298193
+    required_other_revenue_usd_per_kw_year: 142.4605710070414
+    top_site_by_p10: cs-70654
+    top_site_by_p50: cs-130562
+  expected_mentions:
+  - P10
+  mock_response: Site cs-70654, a primary school on MECo's G-2 demand rate, ranks 1 of 40 by bad-case
+    (P10) NPV, which makes it the most robust site, though it is only 3rd by median (P50) NPV. In a bad-case
+    future, one that only 1 in 10 simulated futures do worse than, it loses about $230k over 15 years;
+    in a typical (median) one it loses about $186k. It never pays back on demand-charge savings alone,
+    even at $0 battery cost, and would need about $142/kW-year of other revenue to break even at the assumed
+    $1,570/kW.
+- id: best_median_differs
+  about: Best by median (P50) but 2nd by P10; must say which measure.
+  facts:
+    site_id: cs-130562
+    building_type: Outpatient
+    tariff_name: Massachusetts Electric Co G-2 Demand SEMA Load Zone
+    tariff_is_proxy: false
+    n_sites: 40
+    n_draws: 8000
+    life_years: 15
+    capex_usd_per_kw: 1570.371
+    rank: 2
+    rank_by_p50: 1
+    npv_p10: -230203.3319900791
+    npv_p50: -183628.7166033733
+    npv_p90: -142802.18865287246
+    p_npv_positive: 0.0
+    breakeven_capex_usd_per_kw: -132.57347616631395
+    required_other_revenue_usd_per_kw_year: 139.45573152958067
+    top_site_by_p10: cs-70654
+    top_site_by_p50: cs-130562
+  expected_mentions:
+  - median
+  mock_response: Site cs-130562, an outpatient clinic, is the best site by median (P50) NPV, about -$184k
+    over 15 years, but 2nd of 40 on robustness because its bad case (P10 NPV, -$230,203) is slightly worse
+    than that of cs-70654, the most robust site. None of the 8,000 simulated futures came out ahead, and
+    it never pays back on demand-charge savings, even at $0 battery cost; it would need about $139/kW-year
+    of other revenue to break even.
+- id: g3_time_of_use
+  about: 'A G-3 site: the explanation should say demand is charged only in on-peak hours.'
+  facts:
+    site_id: cs-144167
+    building_type: SecondarySchool
+    tariff_name: Massachusetts Electric Co G-3 Time of Use SEMA Load Zone (demand charged only on the
+      peak in its on-peak hours)
+    tariff_is_proxy: false
+    n_sites: 40
+    n_draws: 8000
+    life_years: 15
+    capex_usd_per_kw: 1570.371
+    rank: 3
+    rank_by_p50: 5
+    npv_p10: -233763.07636271138
+    npv_p50: -190224.8875166089
+    npv_p90: -153973.9134082635
+    p_npv_positive: 0.0
+    breakeven_capex_usd_per_kw: -209.55598455107585
+    required_other_revenue_usd_per_kw_year: 145.75990184871358
+    top_site_by_p10: cs-70654
+    top_site_by_p50: cs-130562
+  expected_mentions:
+  - on-peak
+  mock_response: Site cs-144167, a secondary school on MECo's G-3 time-of-use rate, where demand is charged
+    only on the peak in its on-peak hours, ranks 3rd of 40 by bad-case (P10) NPV and 5th by median (P50)
+    NPV. Its bad-case loss is about $234k over 15 years and its median loss about $190k. It never pays
+    back on demand-charge savings, even at $0 battery cost, and would need about $146/kW-year of other
+    revenue to break even.
+- id: middle_of_pack
+  about: A mid-ranked G-3 site (formerly the near-miss on the G-2 proxy).
+  facts:
+    site_id: cs-118913
+    building_type: RetailStripmall
+    tariff_name: Massachusetts Electric Co G-3 Time of Use SEMA Load Zone (demand charged only on the
+      peak in its on-peak hours)
+    tariff_is_proxy: false
+    n_sites: 40
+    n_draws: 8000
+    life_years: 15
+    capex_usd_per_kw: 1570.371
+    rank: 20
+    rank_by_p50: 19
+    npv_p10: -244955.1449964591
+    npv_p50: -199650.34339725174
+    npv_p90: -159839.54289348924
+    p_npv_positive: 0.0
+    breakeven_capex_usd_per_kw: -279.198299216636
+    required_other_revenue_usd_per_kw_year: 151.46297677160408
+    top_site_by_p10: cs-70654
+    top_site_by_p50: cs-130562
+  expected_mentions:
+  - 20th
+  mock_response: 'Site cs-118913, a strip mall on the G-3 time-of-use rate, sits in the middle of the
+    40 sites: 20th by bad-case (P10) NPV and 19th by median (P50) NPV. It loses about $245k in a bad-case
+    future and about $200k in a typical one over 15 years, and none of the 8,000 simulated futures came
+    out ahead. It never pays back on demand-charge savings, even at $0 battery cost.'
+- id: last_place
+  about: Ranked 40 of 40 on both measures; 'worst' must name its measure.
+  facts:
+    site_id: cs-52936
+    building_type: FullServiceRestaurant
+    tariff_name: Massachusetts Electric Co G-3 Time of Use SEMA Load Zone (demand charged only on the
+      peak in its on-peak hours)
+    tariff_is_proxy: false
+    n_sites: 40
+    n_draws: 8000
+    life_years: 15
+    capex_usd_per_kw: 1570.371
+    rank: 40
+    rank_by_p50: 40
+    npv_p10: -254777.09572197462
+    npv_p50: -210996.93771232956
+    npv_p90: -175015.62621028378
+    p_npv_positive: 0.0
+    breakeven_capex_usd_per_kw: -402.5332245670929
+    required_other_revenue_usd_per_kw_year: 161.5629902944257
+    top_site_by_p10: cs-70654
+    top_site_by_p50: cs-130562
+  expected_mentions:
+  - '40'
+  mock_response: Site cs-52936, a full-service restaurant on the G-3 time-of-use rate, is the worst of
+    the 40 sites by both bad-case (P10) and median (P50) NPV, at about -$255k and -$211k over 15 years.
+    It never pays back on demand-charge savings, even at $0 battery cost, and would need about $162/kW-year
+    of other revenue to break even.

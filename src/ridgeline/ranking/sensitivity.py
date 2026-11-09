@@ -93,6 +93,8 @@ def tornado(
     base_rank = ranks_by(base_npv, ids)
     rows = []
     for name in EconomicInputs.UNCERTAIN:
+        if name == "proxy_demand_multiplier" and not any(s.tariff_is_proxy for s in sites):
+            continue  # it only touches proxy-tariff sites, and there are none
         r = getattr(inputs, name)
         low = expected_npv(sites, inputs, center.with_value(name, r.low))[:, 0]
         high = expected_npv(sites, inputs, center.with_value(name, r.high))[:, 0]

@@ -58,6 +58,7 @@ def site_economics(
             bldg_id=s.bldg_id,
             building_type=s.building_type,
             tariff_is_proxy=bool(rows[s.site_id]["tariff_is_proxy"]),
+            tariff_id=str(rows[s.site_id]["tariff_id"]),
             demand_savings_usd=float(rows[s.site_id]["practical_demand_savings_usd"]),
             energy_savings_usd=float(rows[s.site_id]["practical_energy_savings_usd"]),
             churn_hazard=churn_hazard(assumptions, s.building_type),
@@ -91,21 +92,24 @@ def rank_sites(
         return compare_ranks(base_rank, _ranks(other), label, change, threshold=threshold)
 
     n_proxy = sum(s.tariff_is_proxy for s in sites)
-    shifts: list[RankShift] = []
-    for value in PROXY_SWEEP:
+    # The proxy sweep only means something when some site is on a proxy tariff (none since ADR-016).
+    proxy_shifts: list[RankShift] = []
+    for value in PROXY_SWEEP if n_proxy else ():
         pinned = run(sites, draws.with_value("proxy_demand_multiplier", value))
         change = f"If the proxy demand charge ({n_proxy} sites above 200 kW) were {_pct(value)}"
-        shifts.append(shift(pinned, f"proxy_demand_x{value:g}", change))
+        proxy_shifts.append(shift(pinned, f"proxy_demand_x{value:g}", change))
+    demand_shifts: list[RankShift] = []
     everyone_proxy = [s.model_copy(update={"tariff_is_proxy": True}) for s in sites]
     for value in PROXY_SWEEP:
         everyone = run(everyone_proxy, draws.with_value("proxy_demand_multiplier", value))
-        shifts.append(
+        demand_shifts.append(
             shift(
                 everyone,
                 f"all_demand_x{value:g}",
                 f"If every site's demand charge were {_pct(value)}",
             )
         )
+    shifts = [*proxy_shifts, *demand_shifts]
     no_churn = run(sites, churn=False)
     churn_shift = compare_ranks(
         _ranks(no_churn), base_rank, "churn_on_vs_off", "Adding tenant churn", threshold=threshold
@@ -130,10 +134,11 @@ def rank_sites(
             f"each other as tied; below, a site only counts as moved if it shifts {threshold} or "
             "more places."
         ),
-        "proxy_tariff": _proxy_sentence(shifts[:2], n_proxy),
-        "all_demand": _all_demand_sentence(shifts[2:4]),
+        "all_demand": _all_demand_sentence(demand_shifts),
         "tenant_churn": churn_sentence(base, no_churn, churn_shift),
     }
+    if proxy_shifts:
+        explanations["proxy_tariff"] = _proxy_sentence(proxy_shifts, n_proxy)
     return RankingResult(base, tornado(sites, inputs, threshold), sweep, fan, shifts, explanations)
 
 
@@ -248,7 +253,7 @@ def headline_sentence(ranking: pd.DataFrame, inputs: EconomicInputs, n_draws: in
     )
     breakeven = float(closest["breakeven_capex_usd_per_kw"])
     if breakeven <= 0:
-        central = f" In the central case every site {NEVER_PAYS_BACK}."
+        central = " In the central case no site pays back, even at $0 battery cost."
     elif closest["site_id"] == top["site_id"]:
         central = (
             f" In the central case it breaks even only if the battery cost about "

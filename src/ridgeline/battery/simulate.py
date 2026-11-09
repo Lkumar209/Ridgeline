@@ -28,7 +28,7 @@ from typing import Literal
 import numpy as np
 import pandas as pd
 
-from ridgeline.battery.billing import interval_prices, month_bill
+from ridgeline.battery.billing import demand_billed, interval_prices, month_bill
 from ridgeline.battery.dispatch import (
     Dispatch,
     feasible_threshold,
@@ -55,6 +55,7 @@ def simulate_site(
     index = pd.DatetimeIndex(load_kw.index)
     dt = (index[1] - index[0]).total_seconds() / 3600
     prices = interval_prices(index, tariff)
+    billed = demand_billed(prices)
     values = load_kw.to_numpy(dtype=float)
     months = list(prices.month.unique())
     rows_by_month = [np.flatnonzero(prices.month == m) for m in months]
@@ -65,6 +66,8 @@ def simulate_site(
         # Month 0 has no history. "wraparound" borrows the last month of the year (lookahead).
         has_history = i > 0 or history == "wraparound"
         previous = values[rows_by_month[i - 1]] if has_history else None
+        previous_billed = billed[rows_by_month[i - 1]] if has_history else None
+        month_billed = billed[rows]
 
         def bill(net: np.ndarray, rows: np.ndarray = rows) -> Bill:
             full = np.zeros(len(values))
@@ -82,8 +85,8 @@ def simulate_site(
             start_threshold = float("nan")
             practical = idle_dispatch(load, spec)
         else:
-            start_threshold = feasible_threshold(previous, spec, dt)
-            practical = threshold_dispatch(load, spec, start_threshold, dt)
+            start_threshold = feasible_threshold(previous, spec, dt, billed=previous_billed)
+            practical = threshold_dispatch(load, spec, start_threshold, dt, billed=month_billed)
         record: dict[str, object] = {
             "month": str(month),
             "practical_start_threshold_kw": start_threshold,
@@ -96,7 +99,13 @@ def simulate_site(
         }
         dispatches: dict[str, Dispatch] = {
             "practical": practical,
-            "oracle": threshold_dispatch(load, spec, feasible_threshold(load, spec, dt), dt),
+            "oracle": threshold_dispatch(
+                load,
+                spec,
+                feasible_threshold(load, spec, dt, billed=month_billed),
+                dt,
+                billed=month_billed,
+            ),
         }
         if with_optimal:
             dispatches["optimal"] = optimal_dispatch(load, prices, rows, spec, dt)

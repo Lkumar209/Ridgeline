@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from ridgeline.data.schemas import Site
@@ -291,3 +293,44 @@ def test_configured_proxies_name_an_assumption_labeled_as_such() -> None:
     assumptions = load_assumptions()
     for rule in load_settings().tariff_proxies:
         assert assumptions[rule.assumption_key].source == "ASSUMPTION"
+
+
+def test_committed_meco_g3_matches_its_published_values() -> None:
+    """Data contract for data/tariffs/meco_g3_sema.json (URDB 67d0b140ad6db765a70b0a5c).
+
+    Values are the 2025-02-01 URDB snapshot; National Grid's later rates differ (ADR-016).
+    """
+    from ridgeline.battery.billing import demand_billed, interval_prices
+    from ridgeline.config import REPO_ROOT
+
+    (g3,) = load_tariff_file(REPO_ROOT / "data" / "tariffs" / "meco_g3_sema.json")
+    assert (g3.eiaid, g3.tariff_id) == (11804, "67d0b140ad6db765a70b0a5c")
+    assert g3.name == "G-3 Time of Use SEMA Load Zone"
+    assert g3.flat_demand_usd_per_kw_by_month == [0.0] * 12
+    assert g3.demand_tou_usd_per_kw is not None
+    assert g3.demand_tou_usd_per_kw.rates == [0.0, 8.55]
+    assert g3.energy_usd_per_kwh.rates == [0.00815, 0.01074]
+    assert g3.fixed_monthly_usd == 350.0
+    assert (g3.min_peak_kw, g3.max_peak_kw) == (200.0, None)
+    assert str(g3.effective_date) == "2025-02-01"
+    assert [str(u).rsplit("/", 1)[-1] for u in g3.source_urls] == [
+        "meco_delivery.pdf",
+        "meco_basic_service.pdf",
+        "meco_g3.pdf",
+    ]
+    # Demand is billed on weekdays 8:00-20:59 local only (the tariff's 8 a.m.-9 p.m. peak).
+    index = pd.date_range("2018-07-09 04:00", periods=7 * 96, freq="15min", tz="UTC")  # Mon
+    billed = demand_billed(interval_prices(index, g3))
+    local = index.tz_convert("America/New_York")
+    expected = (local.day_of_week < 5) & (local.hour >= 8) & (local.hour < 21)
+    np.testing.assert_array_equal(billed, np.asarray(expected))
+
+
+def test_committed_g2_and_g3_split_sites_at_200_kw() -> None:
+    from ridgeline.config import REPO_ROOT
+
+    tariffs = load_tariff_dir(REPO_ROOT / "data" / "tariffs")
+    by_name = {t.name: t for t in tariffs}
+    g2, g3 = by_name["G-2 Demand SEMA Load Zone"], by_name["G-3 Time of Use SEMA Load Zone"]
+    assert g2.is_eligible(150.0, 20_000.0) and not g3.is_eligible(150.0, 20_000.0)
+    assert g3.is_eligible(450.0, 90_000.0) and not g2.is_eligible(450.0, 90_000.0)

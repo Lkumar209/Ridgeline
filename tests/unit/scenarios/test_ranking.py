@@ -45,7 +45,7 @@ def test_cost_inputs_never_reorder_sites() -> None:
 
 
 def test_rank_sites_gives_every_explanation() -> None:
-    result = rank_sites(five_sites(), inputs(), n_draws=300, seed=11)
+    result = rank_sites(five_sites(), inputs(), n_draws=300, seed=11)  # 2 of 5 sites are proxies
     assert set(result.explanations) == {
         "headline",
         "other_revenue",
@@ -59,6 +59,14 @@ def test_rank_sites_gives_every_explanation() -> None:
     assert "breakeven_capex_usd_per_kw" in result.ranking
     assert neighbour_gap(result.ranking) >= 0
     assert "$-" not in " ".join(result.explanations.values())  # money reads "-$1,234"
+
+
+def test_no_proxy_sentence_or_sweep_without_proxy_sites() -> None:
+    sites = [s.model_copy(update={"tariff_is_proxy": False}) for s in five_sites()]
+    result = rank_sites(sites, inputs(), n_draws=300, seed=11)
+    assert "proxy_tariff" not in result.explanations
+    assert not [s for s in result.shifts if s.label.startswith("proxy_demand")]
+    assert "stand-in" not in " ".join(result.explanations.values())
 
 
 def test_usd_formatting() -> None:
@@ -164,7 +172,7 @@ def test_headline_when_no_site_ever_breaks_even() -> None:
     from ridgeline.ranking.pipeline import headline_sentence
 
     text = headline_sentence(_ranking([("cs-a", 1, 1, -5.0), ("cs-b", 2, 2, -9.0)]), inputs(), 100)
-    assert "every site never pays back, even at $0 battery cost" in text
+    assert "no site pays back, even at $0 battery cost" in text
     assert "/kW, versus" not in text
 
 
@@ -174,3 +182,9 @@ def test_revenue_sentence_names_the_site_it_means() -> None:
     need = result.ranking.set_index("site_id")["required_other_revenue_usd_per_kw_year"]
     assert f"the site needing the least ({need.idxmin()}, ranked" in text
     assert "the best site" not in text
+
+
+def test_tornado_drops_the_proxy_input_without_proxy_sites() -> None:
+    sites = [s.model_copy(update={"tariff_is_proxy": False}) for s in five_sites()]
+    assert "proxy_demand_multiplier" not in set(tornado(sites, inputs())["input"])
+    assert "proxy_demand_multiplier" in set(tornado(five_sites(), inputs())["input"])
