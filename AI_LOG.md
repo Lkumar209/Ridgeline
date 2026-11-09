@@ -404,3 +404,30 @@ cs-118913, which on its real G-3 tariff no longer breaks even). G-2 sites take 8
 3. *Screenshot:* `docs/m5/map_page.png` re-taken with Playwright at 2× (Leaflet 1.9.4 served from
    the npm registry copy, whose SRI hashes match the page's pinned ones; map tiles blocked, as
    before). Checked: 40 pins, no page errors, current headline and tariff label.
+
+## Map page redesign
+
+**Key prompt.** "Does anything need to be fixed? ... make the UI look nicer ... minimalistic,
+modern, sleek ... don't remove anything", with Apple's design guidance (response, restraint,
+translucent materials, size-specific typography, reduced-motion/transparency/contrast).
+
+**What changed.** Same content, reorganized: a translucent sticky header with the run summary; a
+"The finding" headline; cards with hairline borders; a site picker; a site header with a rank
+badge; the stats as a grouped grid with P10/P50/P90 labeled as bad, median and good case; chart
+keys instead of prose captions; explanations as titled rows. System font with size-specific
+tracking and leading; one accent color; data colors unchanged (validated ramp). Respects
+prefers-reduced-motion, prefers-reduced-transparency and prefers-contrast.
+
+**What was wrong, and how it was caught**
+1. *"Black line: break-even" was wrong in dark mode* (the line is white there). Found in the
+   user's dark-mode screenshot. Now a chart key.
+2. *Fast clicks could show the wrong site:* two overlapping requests, the slower one rendered
+   last. Found by reading `showSite`; now only the latest request renders (checked in Playwright
+   by firing two selections back to back).
+3. *No indication of the selected site on the map:* added a ring and a larger pin.
+4. *Chart readout was mouse-only:* switched to Pointer Events, so touch works too.
+5. *No keyboard path to a site:* added a native site picker, ordered by rank.
+6. *Colors went stale when the OS switched light/dark:* the page now redraws on the change.
+7. *My own regressions while redesigning, caught by checking screenshots:* a sticky detail panel
+   taller than the window hid its cash-flow chart (sticky removed), and a narrower chart margin
+   clipped the minus sign on "-$100,000" (margin widened).
