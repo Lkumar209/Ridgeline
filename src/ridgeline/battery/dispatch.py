@@ -6,7 +6,12 @@ so much that net load rises above the threshold. With `ratchet=True`, when the b
 hold the threshold the threshold rises to the new net peak: that month's billing peak is
 already set, so there is no point saving energy to defend a lower level.
 
-Two consequences hold by construction and are property-tested:
+Time-of-use demand (DECISIONS.md ADR-016): `billed` marks the intervals whose peak is billed (for
+G-3, weekday 8 a.m.-9 p.m.). Outside them the battery never discharges and recharges at full
+power, since a higher off-window peak costs nothing. Without `billed` every interval counts, which
+is the original rule exactly.
+
+Two consequences hold by construction and are property-tested (for billed intervals):
 * net load never exceeds max(original load, threshold), so the battery never raises the
   billing peak when the threshold is at or below the month's peak;
 * net load is never negative (no export).
@@ -53,6 +58,7 @@ def threshold_dispatch(
     *,
     ratchet: bool = True,
     initial_energy_kwh: float | None = None,
+    billed: np.ndarray | None = None,
 ) -> Dispatch:
     """Run the threshold rule over `load_kw`. The battery starts full unless told otherwise."""
     lim = battery_limits(spec)
@@ -64,7 +70,12 @@ def threshold_dispatch(
     charge, discharge, stored = np.zeros(n), np.zeros(n), np.zeros(n)
     for t in range(n):
         load = float(load_kw[t])
-        if load > threshold:
+        if billed is not None and not billed[t]:
+            room = max(lim.e_max_kwh - energy, 0.0) / (lim.eta_charge * dt)
+            c = min(lim.power_kw, room)
+            charge[t] = c
+            energy += c * lim.eta_charge * dt
+        elif load > threshold:
             deliverable = max(energy - lim.e_min_kwh, 0.0) * lim.eta_discharge / dt
             d = min(load - threshold, lim.power_kw, deliverable)
             discharge[t] = d
@@ -81,19 +92,29 @@ def threshold_dispatch(
 
 
 def feasible_threshold(
-    load_kw: np.ndarray, spec: BatterySpec, interval_hours: float, tol: float = THRESHOLD_TOL_KW
+    load_kw: np.ndarray,
+    spec: BatterySpec,
+    interval_hours: float,
+    tol: float = THRESHOLD_TOL_KW,
+    billed: np.ndarray | None = None,
 ) -> float:
-    """Lowest threshold the battery can hold over `load_kw` (bisection, no ratchet).
+    """Lowest threshold the battery can hold over the billed intervals of `load_kw` (bisection,
+    no ratchet).
 
     Uses the whole series, so it is an oracle when applied to the same period it was computed
     on. The practical controller applies it to the *previous* month instead.
     """
-    peak = float(np.max(load_kw))
+    mask = np.ones(len(load_kw), dtype=bool) if billed is None else np.asarray(billed, dtype=bool)
+    if not mask.any():
+        return float(np.max(load_kw))  # no billed peak to defend
+    peak = float(np.max(load_kw[mask]))
     lo, hi = max(peak - battery_limits(spec).power_kw, 0.0), peak
 
     def holds(threshold: float) -> bool:
-        run = threshold_dispatch(load_kw, spec, threshold, interval_hours, ratchet=False)
-        return float(np.max(run.net_kw)) <= threshold + tol
+        run = threshold_dispatch(
+            load_kw, spec, threshold, interval_hours, ratchet=False, billed=billed
+        )
+        return float(np.max(run.net_kw[mask])) <= threshold + tol
 
     if holds(lo):
         return lo

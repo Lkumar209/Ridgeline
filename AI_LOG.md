@@ -321,3 +321,70 @@ validator that rejects outputs inconsistent with the source) and the download re
 9. *Download retries:* the earlier "download-retry PR" never existed (see the previous entry).
    Built now with a stated policy (transient errors only, so a blocked domain is still reported
    at once), tested with an `httpx.MockTransport`.
+
+## M6 live run
+
+**Key prompt.** The user created an Anthropic API key and asked for the live evals. (The key was
+pasted into chat; the user was told it can't be forgotten from the transcript and should be
+revoked after the run. It was used only in the command environment, never written to a file.)
+
+**Results on claude-opus-5-5, effort medium**
+- First live run: **9/11**. Second, after the fixes below: **11/11**.
+
+**What was wrong, and how it was caught**
+1. *The eval was wrong about "no demand charge".* For "There is no demand charge under this rate"
+   the model answered 0 with that exact quote. The eval expected null and the validator rejected
+   it (no digit in the quote). Zero is the better reading: the text states it. Fixed the expected
+   value, the prompt (says so explicitly) and the validator: 0 is accepted only when the quote says
+   "no/without … charge". A test checks an unrelated "not" can't justify a zero.
+2. *A real omission, caught by the validator.* One explanation of cs-144167 left out "never pays
+   back". To see the text, the eval report now prints failed explanations. In 3 more runs of that
+   case the caveat was present each time, so this was run-to-run variation, and the validator
+   stopped the bad output from being shown. That is the intended design.
+3. *The eval was too literal about wording.* It required the word "robust"; the model wrote "ranks
+   1 of 40 by bad-case (P10) NPV", which says the same thing more precisely. The expected phrase is
+   now "P10" (naming the measure is what matters).
+
+**Lesson.** Two of three live failures were eval mistakes, not model mistakes. Hand-written mock
+answers can't show that; a live run is needed before trusting an eval set.
+
+## G-3 tariff (replacing the G-2 proxy)
+
+**Key prompt.** "Do the G-3 tariff now with the OpenEI key I pasted; I'll approve the network
+card." (The key went only into command environments, never a file; the user was told to
+regenerate it.) The environment's allowed hosts gained `api.openei.org` and
+`www.nationalgridus.com`, approved by the user.
+
+**What was done**
+- Listed EIA 11804 commercial rates in URDB (280 records): the current secondary-voltage
+  "G-3 Time of Use SEMA Load Zone" has two records. A field-by-field diff showed they differ only
+  in supply ("Delivery" vs "Delivery with Standard Offer"), the same pattern as G-2's pair. Chose
+  the Delivery one to match G-2. ADR-010's note that only 115 kV G-3 records existed was wrong:
+  they were not found then, without an API key.
+- Checked the record against National Grid's own PDFs: the rules (≥ 200 kW, weekday 8 a.m.–9 p.m.
+  peak, 15-minute demand, 9 off-peak holidays) match `meco_g3.pdf`.
+- Window-aware controller, ranking `tariff_id`, explanation facts with tariff names, 7 new tests
+  (240 total), ADR-016, regenerated `docs/m4`, new explanation eval cases.
+
+**What was wrong or surprising, and how it was caught**
+1. *Both URDB records are a 2025 snapshot.* The current rate summary lists G-3 demand at $10.61/kW
+   (record $8.55) and G-2 at $15.24 (record $14.82). Found by checking the record against the
+   source PDF instead of trusting it. Kept the URDB values for both (same snapshot, single source
+   per number) and documented the drift; a 2026 update needs the owner's OK to hand-transcribe.
+2. *The G-3 record's energy rates are the distribution component only,* despite its "Retail
+   Delivery Price" comment; G-2's record uses the full price. Found in the same PDF check.
+   Documented; it affects only the cost of battery losses.
+3. *The all-hours controller wastes energy under G-3.* Measured before deciding: the
+   window-aware rule wins on 15 of 23 G-3 sites and loses on 4 (median $2,266 vs $2,084/yr).
+   G-2 results are byte-identical, guarded by a mask-of-all-True test and the golden file.
+4. *Generated text broke with zero proxy sites:* "the stand-in tariff used for the 0 large
+   sites…" and a zero-swing proxy bar in the tornado. Caught by reading the regenerated output.
+   The proxy sweep, sentence and tornado row now appear only when proxy sites exist (tests added).
+5. *"In the central case every site never pays back"* read badly once every site was in that
+   group; it now reads "no site pays back".
+6. *The LLM facts called every non-proxy site "MECo G-2".* Wrong for the 23 G-3 sites; caught
+   when re-reading `render_facts`. The ranking now carries `tariff_id` and facts name the tariff.
+7. *A test depended on the default config having a proxy rule.* It now builds its own rule.
+
+**Result.** No site pays back in any of 8,000 futures (the proxy run had one positive draw, at
+cs-118913, which on its real G-3 tariff no longer breaks even). G-2 sites take 8 of the top 10.

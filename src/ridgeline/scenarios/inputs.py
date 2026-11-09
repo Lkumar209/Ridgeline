@@ -22,6 +22,7 @@ class SiteEconomics(BaseModel):
     bldg_id: int
     building_type: str
     tariff_is_proxy: bool
+    tariff_id: str | None = Field(default=None, description="Tariff the savings were billed on")
     demand_savings_usd: float = Field(description="Year-1 demand-charge savings")
     energy_savings_usd: float = Field(description="Year-1 energy savings (negative = losses)")
     churn_hazard: float = Field(ge=0, le=1, description="Base annual probability tenant leaves")

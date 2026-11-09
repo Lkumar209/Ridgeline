@@ -98,11 +98,12 @@ def test_a_guessed_demand_charge_on_the_real_g2_text_is_rejected():
 
 # ---- explanations ----------------------------------------------------------------------------
 
+# A real eval case, flagged as a proxy-tariff site so the proxy caveat rule is exercised too.
 FACTS = SiteFacts.model_validate(
-    next(c for c in load_cases()["explanation"] if c["id"] == "most_robust_proxy")["facts"]
-)
+    next(c for c in load_cases()["explanation"] if c["id"] == "most_robust")["facts"]
+).model_copy(update={"tariff_is_proxy": True})
 GOOD = (
-    "Site cs-144167 ranks 1 of 40 by bad-case (P10) NPV, about -$217k over 15 years. "
+    "Site cs-70654 ranks 1 of 40 by bad-case (P10) NPV, about -$230k over 15 years. "
     "It never pays back, even at $0 battery cost, and the result rests on a proxy tariff."
 )
 
@@ -115,12 +116,12 @@ def test_grounded_explanation_is_accepted():
 @pytest.mark.parametrize(
     ("text", "why"),
     [
-        (GOOD.replace("-$217k", "-$220k"), "'-$220k' is not in the facts"),
+        (GOOD.replace("-$230k", "-$232k"), "'-$232k' is not in the facts"),
         (GOOD + " That is $46k worse than its median.", "'$46k' is not in the facts"),
         (GOOD + " Payback takes 12 years.", "'12' is not in the facts"),
         (GOOD + " It beats cs-99999.", "site 'cs-99999' is not in the facts"),
         (GOOD + " It is the best site.", "superlative without a measure"),
-        (GOOD.replace("Site cs-144167", "This site"), "does not name the site"),
+        (GOOD.replace("Site cs-70654", "This site"), "does not name the site"),
         (GOOD.replace("It never pays back, even at $0 battery cost, and t", "T"), "never pays"),
         (GOOD.replace(", and the result rests on a proxy tariff", ""), "proxy"),
     ],
@@ -134,5 +135,15 @@ def test_ungrounded_explanations_are_rejected(text, why):
 def test_every_number_in_the_facts_is_allowed():
     """The facts text itself must pass its own number check (no self-inconsistent facts)."""
     facts_text = render_facts(FACTS)
-    checked = check_explanation(facts_text + " cs-144167 never pays back; proxy.", rules_for(FACTS))
+    checked = check_explanation(facts_text + " cs-70654 never pays back; proxy.", rules_for(FACTS))
     assert not [e for e in checked.errors if "number" in e]
+
+
+def test_an_explicit_no_charge_is_a_stated_zero() -> None:
+    source = "Rate G-1. There is no demand charge under this rate. Use must not exceed 200 kW."
+    zero = _f(0, "There is no demand charge under this rate.")
+    raw = _extraction(demand_charge_usd_per_kw=zero)
+    assert parse_and_check(raw, source, 0.6).accepted
+    # A negation that is not about a charge does not justify a zero.
+    raw = _extraction(fixed_charge_usd_per_month=_f(0, "Use must not exceed 200 kW."))
+    assert not parse_and_check(raw, source, 0.6).accepted

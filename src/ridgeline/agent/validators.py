@@ -36,6 +36,8 @@ class Checked(Generic[T]):
 # ---- extraction -------------------------------------------------------------------------------
 
 _CENTS = re.compile(r"cents?\b|¢")
+# "There is no demand charge", "without a customer charge": an explicit zero, not a missing value.
+_NO_CHARGE = re.compile(r"\b(no|without)\s+(\w+\s+){0,3}charges?\b", re.IGNORECASE)
 
 
 def _quote_in_source(evidence: str, source: str) -> bool:
@@ -43,6 +45,8 @@ def _quote_in_source(evidence: str, source: str) -> bool:
 
 
 def _number_in_evidence(value: float, evidence: str) -> bool:
+    if value == 0 and _NO_CHARGE.search(evidence):
+        return True
     found = quantities(evidence)
     if _CENTS.search(evidence):
         # "1.5 cents per kWh" must come back as 0.015 dollars, not 1.5.

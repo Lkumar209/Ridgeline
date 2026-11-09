@@ -75,6 +75,14 @@ def interval_prices(index: pd.DatetimeIndex, tariff: Tariff) -> IntervalPrices:
     return IntervalPrices(energy, flat, tou_period, tou_rates, local_month)
 
 
+def demand_billed(prices: IntervalPrices) -> np.ndarray:
+    """True for intervals whose peak is billed: a flat demand rate or a TOU period with a rate."""
+    billed = np.asarray(prices.flat_demand_usd_per_kw > 0, dtype=bool)
+    if prices.tou_period is not None and len(prices.tou_rates):
+        billed = billed | (prices.tou_rates[prices.tou_period] > 0)
+    return billed
+
+
 def month_bill(
     net_kw: np.ndarray,
     prices: IntervalPrices,

@@ -57,11 +57,9 @@ gaps:
 
 # Labeled stand-ins where no eligible real tariff exists (DECISIONS.md ADR-010). Each entry must
 # name an ASSUMPTION in assumptions.yaml. Outputs mark proxied sites with tariff_is_proxy.
-tariff_proxies:
-  - base_tariff_id: 67d08dea7568c8189f03c54e  # MECo G-2 Demand (max 200 kW)
-    eiaid: 11804
-    applies_above_kw: 200
-    assumption_key: g2_proxy_above_200kw
+# Empty since ADR-016: MECo G-3 (data/tariffs/meco_g3_sema.json) covers the sites above 200 kW
+# that used to be billed on G-2 as a proxy.
+tariff_proxies: []
 
 scenarios:
   # 15-year Monte Carlo (M4). Every economic input and its range is in assumptions.yaml.

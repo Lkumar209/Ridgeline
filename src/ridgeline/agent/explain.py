@@ -7,11 +7,14 @@ by which measure, or drops a required caveat (never pays back; proxy tariff).
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import pandas as pd
 from pydantic import BaseModel, ConfigDict
 
 from ridgeline.agent.client import LLMClient, LLMRequest
 from ridgeline.agent.validators import Checked, ExplanationRules, check_explanation
+from ridgeline.data.schemas import Tariff
 from ridgeline.ranking.pipeline import breakeven_label, usd
 
 
@@ -22,6 +25,7 @@ class SiteFacts(BaseModel):
 
     site_id: str
     building_type: str
+    tariff_name: str
     tariff_is_proxy: bool
     n_sites: int
     n_draws: int
@@ -47,11 +51,15 @@ def facts_from_ranking(
     ranking: pd.DataFrame,
     site_id: str,
     *,
+    tariff_names: Mapping[str, str],
     n_draws: int,
     life_years: int,
     capex_usd_per_kw: float,
 ) -> SiteFacts:
-    """Facts for `site_id` from a `ranking.csv` table (indexed by site_id or with a column)."""
+    """Facts for `site_id` from a `ranking.csv` table (indexed by site_id or with a column).
+
+    `tariff_names` maps the ranking's tariff_id to a readable description (`describe_tariff`).
+    """
     table = ranking.reset_index() if "site_id" not in ranking.columns else ranking
     rows = table[table["site_id"] == site_id]
     if rows.empty:
@@ -60,6 +68,7 @@ def facts_from_ranking(
     return SiteFacts(
         site_id=site_id,
         building_type=str(row["building_type"]),
+        tariff_name=tariff_names[str(row["tariff_id"])],
         tariff_is_proxy=bool(row["tariff_is_proxy"]),
         n_sites=len(table),
         n_draws=n_draws,
@@ -81,9 +90,9 @@ def facts_from_ranking(
 def render_facts(f: SiteFacts) -> str:
     """The facts as the model sees them, and as the validator checks numbers against."""
     tariff = (
-        "a proxy: MECo G-2 rates applied above G-2's 200 kW limit (an assumption)"
+        f"a proxy: {f.tariff_name} rates applied beyond that tariff's eligibility (an assumption)"
         if f.tariff_is_proxy
-        else "MECo G-2, the real published rate"
+        else f"{f.tariff_name}, the utility's published rate"
     )
     lines = [
         f"Site: {f.site_id} ({f.building_type}), one of {f.n_sites} Massachusetts sites.",
@@ -121,6 +130,16 @@ Rules:
 - If the tariff is a proxy, say that the result rests on a proxy tariff.
 - Say what the bad-case (P10) and median (P50) values mean in everyday words. No headings, no lists.
 """
+
+
+def describe_tariff(tariff: Tariff) -> str:
+    """Readable tariff name for the facts, saying when demand is billed only in a window."""
+    name = f"{tariff.utility} {tariff.name}"
+    tou = tariff.demand_tou_usd_per_kw
+    flat = tariff.flat_demand_usd_per_kw_by_month or []
+    if tou is not None and any(r > 0 for r in tou.rates) and not any(r > 0 for r in flat):
+        return f"{name} (demand charged only on the peak in its on-peak hours)"
+    return name
 
 
 def build_request(facts: SiteFacts) -> LLMRequest:

@@ -16,11 +16,12 @@ buildings it:
 > URL or the label `ASSUMPTION`.
 
 **Current finding:** on demand-charge savings alone, no site pays back at NREL ATB 2026 battery
-costs (about $1,570/kW). Even a far cheaper battery would only help one site: cs-118913 (best by
-median NPV) breaks even in the central case if the battery cost about $56/kW, and needs about
-$124/kW-year of other revenue (for example demand-response payments, not modeled) at today's
-cost. The other 39 never pay back, even at $0 battery cost. The ranking shows where a battery loses
-least, most reliably. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
+costs (about $1,570/kW), in any of 8,000 simulated futures, and none would even at $0 battery cost:
+every site's yearly bill savings are below the battery's fixed O&M. The site needing the least
+other revenue (cs-16342) would need about $139/kW-year (for example demand-response payments, not
+modeled). Every site is billed on its real MECo tariff: G-2 up to 200 kW, G-3 time-of-use above
+(2025 URDB rates). The ranking shows where a battery loses least, most reliably; G-2 sites take 8
+of the top 10. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
 
 ![Map page](docs/m5/map_page.png)
 
@@ -100,6 +101,7 @@ GitHub Actions runs the same `make check` on every push and pull request.
 
 ## Status
 
-M0–M7 are done. The M6 agent layer is tested offline (mock client, 11 evals); its live path was
-not run while it was built, because no API key was available. To try it, set `ANTHROPIC_API_KEY`
-(and optionally `RIDGELINE_LLM_MODEL`) and run `uv run ridgeline evals --live`.
+M0–M7 are done. The M6 agent layer passes its 11 evals offline (mock client) and live on
+claude-opus-5-5 (11/11 after fixing two issues the first live run found; see `AI_LOG.md`). To run
+it yourself, set `ANTHROPIC_API_KEY` (and optionally `RIDGELINE_LLM_MODEL`) and run
+`uv run ridgeline evals --live`. A run costs well under $1.

@@ -136,3 +136,40 @@ def test_savings_split_into_demand_and_energy_adds_up() -> None:
     # With one energy price, round-trip losses can only cost money (no arbitrage to offset them).
     flat = annual_summary(simulate_site(_two_months(), flat_demand_tariff(), SPEC))
     assert flat["practical_energy_savings_usd"] < 0
+
+
+# --- time-of-use demand windows (ADR-016) ------------------------------------------------
+
+
+def test_all_billed_mask_is_identical_to_no_mask() -> None:
+    load = office_like_load(7, seed=5).to_numpy()
+    everywhere = np.ones(len(load), dtype=bool)
+    t = feasible_threshold(load, SPEC, DT)
+    assert feasible_threshold(load, SPEC, DT, billed=everywhere) == t
+    plain = threshold_dispatch(load, SPEC, t - 5, DT)
+    masked = threshold_dispatch(load, SPEC, t - 5, DT, billed=everywhere)
+    np.testing.assert_array_equal(plain.net_kw, masked.net_kw)
+
+
+def test_no_discharge_outside_the_billed_window_and_full_power_recharge() -> None:
+    # A big unbilled spike, then a billed one: the battery ignores the first, shaves the second.
+    load = np.array([300.0, 100.0, 100.0, 180.0])
+    billed = np.array([False, False, True, True])
+    lim = battery_limits(SPEC)
+    run = threshold_dispatch(
+        load, SPEC, 150.0, DT, initial_energy_kwh=lim.e_max_kwh - 10, billed=billed
+    )
+    assert run.discharge_kw[0] == 0.0
+    assert run.net_kw[0] > 300.0  # recharging off-window may raise an unbilled peak
+    assert run.charge_kw[0] == pytest.approx(min(SPEC.power_kw, 10 / (lim.eta_charge * DT)))
+    assert run.discharge_kw[3] == pytest.approx(30.0)
+    assert run.final_threshold_kw == 150.0  # the unbilled spike did not ratchet it
+
+
+def test_feasible_threshold_ignores_unbilled_peaks() -> None:
+    load = np.array([500.0, 100.0, 160.0, 100.0])
+    billed = np.array([False, True, True, True])
+    assert feasible_threshold(load, SPEC, DT, billed=billed) <= 160.0
+    assert feasible_threshold(load, SPEC, DT) >= 500.0 - SPEC.power_kw
+    nothing = np.zeros(4, dtype=bool)
+    assert feasible_threshold(load, SPEC, DT, billed=nothing) == 500.0

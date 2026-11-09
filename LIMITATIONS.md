@@ -88,9 +88,11 @@ list grows each milestone.
   failing still stops with the URL and the error.
 
 ## LLM agent layer (M6)
-- **Not run against a live model while it was built.** No API key was available in that session.
-  The offline evals use hand-written answers, so they test the harness, prompts and validators,
-  not model quality. Run `uv run ridgeline evals --live` with a key to score a real model.
+- **Live results are from very few runs.** On claude-opus-5-5 the first live run passed 9/11 and,
+  after the fixes in AI_LOG, a second passed 11/11. Outputs vary run to run: in 3 re-runs of one
+  explanation case, 1 dropped the "never pays back" caveat (the validator rejected it). Treat
+  11/11 as "works", not as a measured accuracy.
+- **Offline evals test the harness, not the model.** `make evals` uses hand-written answers.
 - **The validators check grounding, not truth.** An extracted value can be correctly quoted from a
   tariff that is itself outdated or for the wrong rate; a quoted number can sit in the right
   sentence but belong to a different charge. Review flagged fields and the evidence quotes.
@@ -114,9 +116,26 @@ list grows each milestone.
 - **Load zone.** The record is labeled for the SEMA load zone. That should not change delivery
   charges, but it would matter if supply were included.
 - **Eligibility.** The tariff applies up to 200 kW, with average use above 10,000 kWh/month.
-  - EIA 11804 sites above 200 kW are billed on G-2 values as a labeled proxy (ADR-010). Their
-    savings are indicative only; a real large-customer rate (G-3) is time-of-use.
-  - M4 sweeps the demand charge by about ±30% to test whether rankings survive a wrong proxy.
+  Sites above 200 kW are on G-3 (below).
+
+## MECo G-3 tariff (`data/tariffs/meco_g3_sema.json`, ADR-016)
+- **2025 rates, not today's.** Both tariff files are the URDB snapshot effective 2025-02-01.
+  National Grid's current summary (changes through 2026-10-01) lists G-3 demand at $10.61/kW (file:
+  $8.55) and G-2 at $15.24/kW (file: $14.82). Values would rise for every site; G-3 sites would
+  gain relative to G-2 sites. The ±30% all-sites demand sweep brackets the size of the change, but
+  a G-3-only increase has not been run as a scenario.
+- **Energy rates look like the distribution component only.** The record says "Retail Delivery
+  Price" but its $0.01074/$0.00815 per kWh match National Grid's distribution rate, not the full
+  delivery price (~$0.066/kWh in 2026). G-2's file uses the full price. This understates the cost
+  of battery round-trip losses on G-3 sites; demand savings are unaffected.
+- **Holidays.** The tariff treats 9 holidays as off-peak. URDB schedules cannot express holidays,
+  so the model bills demand on those weekdays too (slightly conservative for the battery).
+- **Billing demand simplified** to the 15-minute kW peak in peak hours; the 90%-of-kVA clause is
+  handled as for G-2 (`billing_demand_basis`). The optional transmission coincident-peak billing
+  is not modeled.
+- **Controller in time windows.** The practical controller now discharges only in billed hours
+  (ADR-016). Across the 23 G-3 sites it beats the all-hours rule on 15 and loses on 4 (median
+  savings $2,266 vs $2,084 per year). It still captures only ~45% of the perfect-foresight bound.
 
 ## Not modeled (by design, per the brief)
 - Wholesale market, capacity or demand-response revenue.

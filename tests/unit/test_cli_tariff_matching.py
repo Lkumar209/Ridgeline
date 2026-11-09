@@ -9,7 +9,7 @@ import pytest
 import typer
 
 from ridgeline.cli import _tariffs_for
-from ridgeline.config import Settings, load_settings
+from ridgeline.config import Settings, TariffProxy, load_settings
 from ridgeline.data.sites import read_sites
 from tests.battery_helpers import FIXTURE
 
@@ -23,8 +23,17 @@ def _settings_with_tariff_dir(directory: Path) -> Settings:
 
 def test_proxy_without_its_base_tariff_is_a_config_error(tmp_path: Path) -> None:
     settings = load_settings()
+    rule = TariffProxy(
+        base_tariff_id="67d08dea7568c8189f03c54e",
+        eiaid=11804,
+        applies_above_kw=200,
+        assumption_key="proxy_demand_charge_multiplier",
+    )
     settings = settings.model_copy(
-        update={"paths": settings.paths.model_copy(update={"tariffs_dir": tmp_path})}
+        update={
+            "paths": settings.paths.model_copy(update={"tariffs_dir": tmp_path}),
+            "tariff_proxies": [rule],
+        }
     )
     with pytest.raises(ValueError, match="unknown tariff"):
         _tariffs_for(settings, read_sites(settings.resolve(settings.paths.sites_file)), None)

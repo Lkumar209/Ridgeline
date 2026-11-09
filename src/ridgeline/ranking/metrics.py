@@ -22,6 +22,7 @@ def summarize_npv(npv: np.ndarray, sites: list[SiteEconomics]) -> pd.DataFrame:
             "site_id": [s.site_id for s in sites],
             "building_type": [s.building_type for s in sites],
             "tariff_is_proxy": [s.tariff_is_proxy for s in sites],
+            "tariff_id": [s.tariff_id for s in sites],
             "npv_p10": p10,
             "npv_p50": p50,
             "npv_p90": p90,

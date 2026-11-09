@@ -140,22 +140,25 @@ Each one is scoped to a few files, has an obvious test, and moves the main resul
   pass. Add a dev-subset check that median capture rises, and report it like the lookahead comparison
   in `docs/m3_dispatch.md`.
 
-### B. A proper MECo G-3 tariff for sites above 200 kW
+### B. Current (2026) tariff rates
 
-- **Why:** 23 of 40 sites use G-2 values as a labeled proxy (ADR-010).
+- **Why:** the G-2 and G-3 files are URDB's 2025 snapshot; National Grid's 2026 demand charges
+  are higher (G-3 +24%, G-2 +3%; LIMITATIONS.md). The G-3 swap itself is done (ADR-016) and is a
+  worked example of this kind of change.
 - **Where:**
-  - drop the URDB JSON into `data/tariffs/`;
-  - add a data-contract test in `tests/unit/test_tariffs.py`;
-  - remove or narrow the proxy rule in `config/default.yaml`.
-- **Watch out:** billing already supports TOU demand charges, but the practical controller only
-  defends the all-hours peak (LIMITATIONS.md), so check how much of the LP's advantage is TOU windows.
-- **Done when:** `rank` shows `tariff_is_proxy = false` for those sites, `docs/m4` is regenerated,
-  and the proxy-sweep sentence is updated.
+  - if URDB publishes newer records, drop them into `data/tariffs/` and update the two data-contract
+    tests in `tests/unit/test_tariffs.py`;
+  - otherwise a hand-transcribed tariff from National Grid's rate summary needs the project
+    owner's OK, with the PDF URL and effective date in `assumptions.yaml`.
+- **Watch out:** check the energy-rate column. The URDB G-3 record carries the distribution
+  component only, the G-2 record the full delivery price.
+- **Done when:** both contract tests pin the new values, `rank` and `scripts/report_ranking.py`
+  are re-run, and the rate-vintage notes in LIMITATIONS and `assumptions.yaml` are updated.
 
 ### C. A revenue-stacking scenario
 
 - **Why:** real projects stack demand-response payments. Today the model reports the *required*
-  other revenue ($124–160/kW-year) instead of assuming any (ADR-012).
+  other revenue ($139–162/kW-year) instead of assuming any (ADR-012).
 - **Where:**
   - add an `other_revenue_usd_per_kw_year` term to `scenarios/cashflow.py` (a `Draws` field, so it
     can be uncertain);

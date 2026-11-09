@@ -5,11 +5,12 @@ from typer.testing import CliRunner
 
 from ridgeline.agent.client import MockClient
 from ridgeline.agent.evals import load_cases, mock_client, run_evals
-from ridgeline.agent.explain import SiteFacts, build_request, facts_from_ranking
+from ridgeline.agent.explain import SiteFacts, build_request, describe_tariff, facts_from_ranking
 from ridgeline.agent.tariff_extract import FIELD_HELP
 from ridgeline.agent.tariff_extract import build_request as extraction_request
 from ridgeline.cli import app
 from ridgeline.config import REPO_ROOT
+from ridgeline.data.tariffs import load_tariff_dir
 
 CASES = load_cases()
 
@@ -59,11 +60,14 @@ def test_evals_catch_an_explanation_with_an_invented_number():
 def test_explanation_facts_match_the_committed_ranking():
     """Eval facts are real rows of docs/m4/ranking.csv, not made-up numbers."""
     ranking = pd.read_csv(REPO_ROOT / "docs" / "m4" / "ranking.csv")
+    tariffs = load_tariff_dir(REPO_ROOT / "data" / "tariffs")
+    names = {t.tariff_id: describe_tariff(t) for t in tariffs}
     for case in CASES["explanation"]:
         facts = SiteFacts.model_validate(case["facts"])
         rebuilt = facts_from_ranking(
             ranking,
             facts.site_id,
+            tariff_names=names,
             n_draws=facts.n_draws,
             life_years=facts.life_years,
             capex_usd_per_kw=facts.capex_usd_per_kw,

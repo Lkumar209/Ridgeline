@@ -370,7 +370,12 @@ def explain(
     config: Path | None = typer.Option(None, help="Config file (default: config/default.yaml)."),
 ) -> None:
     """Explain one site's ranking in plain language with an LLM, grounded in `rank` outputs."""
-    from ridgeline.agent.explain import explain_site, facts_from_ranking, render_facts
+    from ridgeline.agent.explain import (
+        describe_tariff,
+        explain_site,
+        facts_from_ranking,
+        render_facts,
+    )
 
     settings = load_settings(config)
     results = settings.resolve(settings.paths.results_dir)
@@ -386,6 +391,7 @@ def explain(
         facts = facts_from_ranking(
             pd.read_csv(results / "ranking.csv"),
             site_id,
+            tariff_names={t.tariff_id: describe_tariff(t) for t in _load_tariffs(settings)},
             n_draws=int(run["n_draws"]),
             life_years=inputs.life_years,
             capex_usd_per_kw=inputs.capex_usd_per_kw.central,

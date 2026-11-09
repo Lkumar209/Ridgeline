@@ -63,16 +63,6 @@ bill_scope_delivery_only:
     are excluded from bills, so battery round-trip losses and any energy arbitrage are
     under-valued. Demand-charge savings, the main value stream here, are unaffected.
 
-g2_proxy_above_200kw:
-  value: MECo G-2 values applied to EIA 11804 sites above 200 kW (G-2 applied beyond its eligibility)
-  unit: tariff proxy
-  source: ASSUMPTION
-  notes: >-
-    No secondary-voltage MECo rate for customers above 200 kW has been found yet (the G-3 records
-    found are 115 kV). Real large-customer rates are time-of-use with different demand charges,
-    so savings for these sites are indicative only. M4 sweeps the demand charge by about +/-30%
-    to test whether rankings survive this. To be replaced when a proper G-3 record is found.
-
 meco_g2_urdb_record:
   value: 67d08dea7568c8189f03c54e (approved = false in URDB)
   unit: URDB rate id
@@ -83,6 +73,33 @@ meco_g2_urdb_record:
     $45/month fixed; eligibility max 200 kW and average use over 10,000 kWh/month. The record is
     marked approved = false. Its sources are National Grid's meco_delivery.pdf, meco_basic_service.pdf
     and meco_g2.pdf. Committed verbatim as data/tariffs/meco_g2_sema.json and pinned by a test.
+
+meco_g3_urdb_record:
+  value: 67d0b140ad6db765a70b0a5c (approved = true in URDB)
+  unit: URDB rate id
+  source: https://apps.openei.org/IURDB/rate/view/67d0b140ad6db765a70b0a5c
+  notes: >-
+    Massachusetts Electric Co (EIA 11804) G-3 Time of Use, SEMA load zone, servicetype Delivery,
+    effective 2025-02-01 (the same snapshot as the G-2 record). $8.55/kW on the monthly peak in
+    weekday 8 a.m.-9 p.m. hours, $0 outside them; energy $0.01074/kWh peak and $0.00815/kWh
+    off-peak; $350/month fixed; eligibility from 200 kW. Chosen over its twin record
+    67d0b147ad6db765a70b0a5d, which adds supply ("Delivery with Standard Offer"), to match the
+    delivery-only G-2 record. Committed verbatim as data/tariffs/meco_g3_sema.json and pinned by
+    a test. Rules (eligibility, peak window, holidays) checked against National Grid's
+    meco_g3.pdf (M.D.P.U. No. 1591, effective 2025-03-31).
+
+tariff_rate_vintage:
+  value: URDB 2025-02-01 snapshot, not current rates
+  unit: scope
+  source: https://www.nationalgridus.com/media/pdfs/billing-payments/tariffs/mae/meco_delivery.pdf
+  notes: >-
+    National Grid's Summary of Electric Delivery Service Rates (M.D.P.U. No. 1-26-I, changes
+    through 2026-10-01, read 2026-11-09) lists G-2 demand at $15.24/kW (record: $14.82) and G-3
+    demand at $10.61/kW (record: $8.55); customer charges match ($45, $350). The model uses the
+    URDB values. The G-3 record's energy rates match the distribution component only, not the
+    full retail delivery price its comment names (2026: $0.06661 peak, $0.06388 off-peak); this
+    under-values battery losses for G-3 sites but not demand savings. The G-3 holidays (9 per
+    year, off-peak) are not in URDB schedules, so the model bills demand on those weekdays.
 
 comstock_load_data:
   value: ComStock 2024 release 2, AMY2018, upgrade 0 (baseline)
@@ -172,8 +189,8 @@ proxy_demand_charge_multiplier:
   unit: multiplier on demand-charge savings, proxy-tariff sites only
   source: ASSUMPTION
   notes: >-
-    About +/-30% at the project owner's request: how wrong the G-2 proxy (sites above 200 kW,
-    g2_proxy_above_200kw) could be. Sites on the real G-2 tariff are not multiplied.
+    About +/-30% at the project owner's request: how wrong a proxy tariff could be. Applies only
+    to sites flagged tariff_is_proxy; since ADR-016 (real G-3 for sites above 200 kW) no site is.
 
 annual_savings_noise_sd:
   value: 0.10
