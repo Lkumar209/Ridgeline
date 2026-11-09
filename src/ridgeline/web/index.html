@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Ridgeline Site Ranking</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H"
@@ -10,25 +11,48 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <h1>Ridgeline <span class="tag">illustrative</span></h1>
-    <p id="headline" class="lede">Loading ranking&hellip;</p>
+  <header class="bar">
+    <div class="bar-inner">
+      <div class="brand">
+        <span class="wordmark">Ridgeline</span>
+        <span class="tag">Illustrative</span>
+      </div>
+      <p class="bar-meta" id="run-meta" aria-live="polite"></p>
+    </div>
   </header>
-  <main>
-    <section class="map-wrap" aria-label="Map of sites">
+
+  <section class="hero" aria-labelledby="finding-label">
+    <p class="eyebrow" id="finding-label">The finding</p>
+    <p id="headline" class="lede">Loading ranking&hellip;</p>
+  </section>
+
+  <main class="layout">
+    <section class="card map-card" aria-label="Map of sites">
       <div id="map" role="application" aria-label="Sites colored by robustness rank"></div>
-      <div class="legend" id="legend" aria-label="Rank legend"></div>
-      <p class="note">Pins are approximate (area centroid, small offset). ComStock buildings have no addresses.</p>
+      <div class="map-foot">
+        <div class="legend" id="legend" aria-label="Rank legend"></div>
+        <p class="note">Pins are approximate (area centroid, small offset). ComStock buildings have no addresses.</p>
+      </div>
     </section>
-    <section class="detail" id="detail" aria-live="polite">
-      <p class="hint">Click a site on the map to see its load and 15-year cash flow.</p>
-    </section>
-    <section class="explain" aria-label="What the results mean">
-      <h2>What the results mean</h2>
-      <ul id="explanations"></ul>
+
+    <aside class="card detail" aria-label="Selected site">
+      <div class="picker">
+        <label for="site-select">Site</label>
+        <select id="site-select" disabled><option>Loading&hellip;</option></select>
+      </div>
+      <div id="detail" class="detail-body" aria-live="polite">
+        <p class="hint">Click a site on the map, or choose one above, to see its load and 15-year cash flow.</p>
+      </div>
+    </aside>
+
+    <section class="card explain" aria-labelledby="explain-title">
+      <h2 id="explain-title">What the results mean</h2>
+      <ul id="explanations" class="explain-list"></ul>
     </section>
   </main>
-  <footer>All values are illustrative model outputs, in real 2025 dollars. See the repository's LIMITATIONS.md.</footer>
+
+  <footer class="foot">All values are illustrative model outputs, in real 2025 dollars. See the repository's LIMITATIONS.md.</footer>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
           integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH"
           crossorigin="anonymous"></script>
