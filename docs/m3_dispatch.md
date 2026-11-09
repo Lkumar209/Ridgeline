@@ -4,6 +4,10 @@
 Results use the real MECo G-2 delivery tariff (URDB `67d08dea7568c8189f03c54e`), with a
 labeled proxy for sites above its 200 kW cap (ADR-010). All outputs are illustrative.
 
+> **Update (ADR-016).** The proxy has since been replaced by MECo's real G-3 time-of-use tariff for
+> sites above 200 kW, and the controller now discharges only in billed hours. Rows marked "proxy"
+> below are from the earlier run; G-2 rows are unchanged. Current numbers: `docs/m4/results.md`.
+
 ## What runs
 
 `uv run ridgeline simulate [--dev-subset] [--tariff-override FILE] [--wraparound-lookahead]`

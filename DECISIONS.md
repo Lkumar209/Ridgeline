@@ -178,6 +178,8 @@ covers the stubs not declaring sparse-matrix support in `linprog`.
 
 ## ADR-010: Tariff coverage, a labeled G-2 proxy and the NSTAR replacement (M3)
 
+*Point 2 (the proxy) is superseded by ADR-016; the proxy mechanism remains in code, unused.*
+
 **Context.** The only usable real tariff is MECo G-2 (EIA 11804, ≤ 200 kW, average use
 > 10,000 kWh/month). It covered 13 of the original 40 sites. No usable NSTAR (EIA 54913) rate was
 found, and the MECo G-3 records found are 115 kV service.
@@ -353,3 +355,35 @@ other 4xx (including a proxy's 403 for a blocked domain) fails at once.
 
 **Rejected.** Retrying every error: a blocked domain must be reported immediately (a rule from the
 brief), not after a minute of retries. A retry library: one loop is clearer than a dependency.
+
+## ADR-016: Real MECo G-3 for sites above 200 kW, and a window-aware controller
+
+**Context.** ADR-010 billed the 23 sites above 200 kW on G-2 values as a labeled proxy, because the
+only G-3 records found then were 115 kV service. With an OpenEI key, URDB lists a secondary-voltage
+"G-3 Time of Use SEMA Load Zone" record from the same 2025-02-01 snapshot as our G-2.
+
+**Decision.**
+- **Tariff:** commit URDB `67d0b140ad6db765a70b0a5c` verbatim as `data/tariffs/meco_g3_sema.json`.
+  It is the Delivery record; its twin `67d0b147…` adds supply ("Delivery with Standard Offer").
+  This matches the delivery-only G-2 record. Eligibility (≥ 200 kW), the weekday 8 a.m.–9 p.m. peak
+  window, 15-minute demand and the holidays were checked against National Grid's `meco_g3.pdf`
+  (M.D.P.U. No. 1591). A data-contract test pins the values and the billed window.
+- **Same snapshot for both tariffs,** even though National Grid's 2026 rates are higher (G-3
+  $10.61 vs $8.55/kW; G-2 $15.24 vs $14.82/kW). Every tariff number keeps a single source file,
+  and the two tariffs stay comparable. The drift is documented (`tariff_rate_vintage`).
+- **No proxy:** `tariff_proxies` is empty. The proxy-only sweep and its sentence run only when a
+  proxy site exists; the tornado drops the proxy input in that case.
+- **Window-aware controller:** `threshold_dispatch` and `feasible_threshold` take a `billed` mask
+  (from `demand_billed`: intervals with a flat demand rate or a TOU demand rate above 0). Outside
+  billed hours the battery does not discharge and recharges at full power. With every interval
+  billed (G-2) the code path is unchanged, and a test checks the mask-of-all-True is identical.
+- **Ranking carries `tariff_id`,** so explanations can name each site's real tariff.
+
+**Rejected.**
+- **Hand-transcribing 2026 rates from the PDF:** the brief allows it only with the owner's OK, and
+  mixing a transcribed G-3 with a URDB G-2 would compare tariffs from different years.
+- **The "Delivery with Standard Offer" record:** it would add supply energy for G-3 only.
+- **Keeping the all-hours controller for G-3:** measured worse on 15 of 23 sites.
+
+**Consequences.** No site pays back in any future (the G-2 proxy had one 1-in-8,000 positive
+draw). G-2 sites take 8 of the top 10. The most robust site is now cs-70654 (G-2).

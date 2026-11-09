@@ -18,11 +18,14 @@ state, results, gotchas, and what is left. Read it top to bottom once. After tha
 - **M6 (LLM agent layer) is done** (ADR-014): 11/11 evals offline and live on claude-opus-5-5
   (the first live run was 9/11; fixes in AI_LOG "M6 live run").
 - **PRs:** #1–#5 merged. The live-eval fixes are on branch `claude/dazzling-cori-pty3ol` in a new PR.
-- **Only open item:** a real G-3 tariff for the 23 proxy sites (§8), which needs the user's URDB
+- **G-3 done (ADR-016):** the 23 sites above 200 kW are on MECo's real G-3 time-of-use rate; no
+  proxies remain. Optional next step: 2026 rates (§8). (Former note follows.)
+  Former open item: a real G-3 tariff for the 23 proxy sites (§8), which needs the user's URDB
   JSON or OpenEI key.
 - **Headline finding:** on demand-charge savings alone, no site pays back at NREL ATB 2026
-  battery costs (~$1,570/kW). Only cs-118913 would break even in the central case, at a hypothetical
-  ~$56/kW battery. The other 39 never pay back, even at $0 battery cost (savings < fixed O&M ~$4.7k/yr).
+  battery costs (~$1,570/kW), in any of 8,000 futures, and none would even at $0 battery cost
+  (savings < fixed O&M ~$4.7k/yr). Most robust: cs-70654 (G-2). Least other revenue needed:
+  cs-16342, ~$139/kW-yr. (Before G-3, cs-118913 broke even at ~$56/kW on the G-2 proxy.)
 - **Quickstart:** `git clone … && cd Ridgeline`, then `uv sync`, then `make demo` (fetch ~30 s,
   rank ~35 s first time, then serves http://127.0.0.1:8000). `make check` is offline: 232 tests,
   ruff, `mypy --strict`. `make evals` runs the M6 evals offline.
@@ -30,7 +33,7 @@ state, results, gotchas, and what is left. Read it top to bottom once. After tha
 ### Suggested opening message for the next chat
 
 > Read HANDOFF.md, ONBOARDING.md and DECISIONS.md in the Ridgeline repo. Check whether PR #5 is
-> merged. Then [add the G-3 tariff from this file / do X]. Follow the working rules in HANDOFF.md section 3.
+> merged. Then [update tariffs to 2026 rates / do X]. Follow the working rules in HANDOFF.md section 3.
 
 ---
 
@@ -311,7 +314,8 @@ All of this is met.
   - churn on/off;
   - second-seed stability;
   - a site counts as "moved" only if it shifts more places than seed noise (now 5+).
-- **Key numbers** (all illustrative, 2025$):
+- **Key numbers** (all illustrative, 2025$). **These are the pre-G-3 proxy run; current numbers are
+  in `docs/m4/results.md` and §0.**
   - **Viability:** 1 of 40 sites has NPV > 0 in 1 of 8,000 draws.
   - **Most robust:** cs-144167 (SecondarySchool, proxy). P10/P50/P90 = −$217,153 / −$171,180 /
     −$131,541; never pays back even at $0.
@@ -458,7 +462,9 @@ make demo           # fetch + rank + serve (http://127.0.0.1:8000)
 1. **Merge the live-eval PR** (user action), then restart the branch from `origin/main`.
 2. **M6 live check: done** (11/11 on claude-opus-5-5). The user's key was pasted into chat and
    should be revoked in the Console; never ask for keys in chat (use the credential form).
-3. **A real MECo G-3 tariff for sites above 200 kW** (the user was searching). When it arrives:
+3. **G-3: done** (ADR-016; the user supplied an OpenEI key, `api.openei.org` and
+   `www.nationalgridus.com` were added to the "cloud" environment's allowed hosts). Optional
+   follow-up: 2026 rates (ONBOARDING starter B). The original plan, for reference:
    - save it verbatim to `data/tariffs/`;
    - add a data-contract test like `test_committed_meco_g2_matches_its_published_values`;
    - remove or narrow the `tariff_proxies` rule;
@@ -468,7 +474,7 @@ make demo           # fetch + rank + serve (http://127.0.0.1:8000)
 4. **ONBOARDING starter features** (well scoped):
    - **A. Better threshold forecasting:** the biggest lever. With perfect foresight, 9 of the 10 dev
      sites would cover O&M.
-   - **B. G-3 tariff:** as item 3.
+   - **B. Current (2026) tariff rates** (replaces the G-3 item, now done).
    - **C. A revenue-stacking scenario:** add a sourced or ASSUMPTION `other_revenue` term to
      `Draws`; never a guessed amount presented as real.
 5. **Download retry: done** (ADR-015). The policy (4 attempts, 2/4/8 s, transient errors only)

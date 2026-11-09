@@ -16,11 +16,12 @@ buildings it:
 > URL or the label `ASSUMPTION`.
 
 **Current finding:** on demand-charge savings alone, no site pays back at NREL ATB 2026 battery
-costs (about $1,570/kW). Even a far cheaper battery would only help one site: cs-118913 (best by
-median NPV) breaks even in the central case if the battery cost about $56/kW, and needs about
-$124/kW-year of other revenue (for example demand-response payments, not modeled) at today's
-cost. The other 39 never pay back, even at $0 battery cost. The ranking shows where a battery loses
-least, most reliably. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
+costs (about $1,570/kW), in any of 8,000 simulated futures, and none would even at $0 battery cost:
+every site's yearly bill savings are below the battery's fixed O&M. The site needing the least
+other revenue (cs-16342) would need about $139/kW-year (for example demand-response payments, not
+modeled). Every site is billed on its real MECo tariff: G-2 up to 200 kW, G-3 time-of-use above
+(2025 URDB rates). The ranking shows where a battery loses least, most reliably; G-2 sites take 8
+of the top 10. Details: [`docs/m4_ranking.md`](docs/m4_ranking.md).
 
 ![Map page](docs/m5/map_page.png)
 

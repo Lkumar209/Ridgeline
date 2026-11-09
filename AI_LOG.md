@@ -347,3 +347,44 @@ revoked after the run. It was used only in the command environment, never writte
 
 **Lesson.** Two of three live failures were eval mistakes, not model mistakes. Hand-written mock
 answers can't show that; a live run is needed before trusting an eval set.
+
+## G-3 tariff (replacing the G-2 proxy)
+
+**Key prompt.** "Do the G-3 tariff now with the OpenEI key I pasted; I'll approve the network
+card." (The key went only into command environments, never a file; the user was told to
+regenerate it.) The environment's allowed hosts gained `api.openei.org` and
+`www.nationalgridus.com`, approved by the user.
+
+**What was done**
+- Listed EIA 11804 commercial rates in URDB (280 records): the current secondary-voltage
+  "G-3 Time of Use SEMA Load Zone" has two records. A field-by-field diff showed they differ only
+  in supply ("Delivery" vs "Delivery with Standard Offer"), the same pattern as G-2's pair. Chose
+  the Delivery one to match G-2. ADR-010's note that only 115 kV G-3 records existed was wrong:
+  they were not found then, without an API key.
+- Checked the record against National Grid's own PDFs: the rules (≥ 200 kW, weekday 8 a.m.–9 p.m.
+  peak, 15-minute demand, 9 off-peak holidays) match `meco_g3.pdf`.
+- Window-aware controller, ranking `tariff_id`, explanation facts with tariff names, 7 new tests
+  (240 total), ADR-016, regenerated `docs/m4`, new explanation eval cases.
+
+**What was wrong or surprising, and how it was caught**
+1. *Both URDB records are a 2025 snapshot.* The current rate summary lists G-3 demand at $10.61/kW
+   (record $8.55) and G-2 at $15.24 (record $14.82). Found by checking the record against the
+   source PDF instead of trusting it. Kept the URDB values for both (same snapshot, single source
+   per number) and documented the drift; a 2026 update needs the owner's OK to hand-transcribe.
+2. *The G-3 record's energy rates are the distribution component only,* despite its "Retail
+   Delivery Price" comment; G-2's record uses the full price. Found in the same PDF check.
+   Documented; it affects only the cost of battery losses.
+3. *The all-hours controller wastes energy under G-3.* Measured before deciding: the
+   window-aware rule wins on 15 of 23 G-3 sites and loses on 4 (median $2,266 vs $2,084/yr).
+   G-2 results are byte-identical, guarded by a mask-of-all-True test and the golden file.
+4. *Generated text broke with zero proxy sites:* "the stand-in tariff used for the 0 large
+   sites…" and a zero-swing proxy bar in the tornado. Caught by reading the regenerated output.
+   The proxy sweep, sentence and tornado row now appear only when proxy sites exist (tests added).
+5. *"In the central case every site never pays back"* read badly once every site was in that
+   group; it now reads "no site pays back".
+6. *The LLM facts called every non-proxy site "MECo G-2".* Wrong for the 23 G-3 sites; caught
+   when re-reading `render_facts`. The ranking now carries `tariff_id` and facts name the tariff.
+7. *A test depended on the default config having a proxy rule.* It now builds its own rule.
+
+**Result.** No site pays back in any of 8,000 futures (the proxy run had one positive draw, at
+cs-118913, which on its real G-3 tariff no longer breaks even). G-2 sites take 8 of the top 10.
