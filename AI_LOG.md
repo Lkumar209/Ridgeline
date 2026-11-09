@@ -388,3 +388,19 @@ regenerate it.) The environment's allowed hosts gained `api.openei.org` and
 
 **Result.** No site pays back in any of 8,000 futures (the proxy run had one positive draw, at
 cs-118913, which on its real G-3 tariff no longer breaks even). G-2 sites take 8 of the top 10.
+
+## Polish after G-3: map tariff labels and a fresh screenshot
+
+**Key prompt.** "Please do that what you mentioned" (refresh the stale screenshot and handoff).
+
+**What was wrong, and how it was caught**
+1. *The map page called every non-proxy site "MECo G-2",* including the 23 G-3 sites: `app.js`
+   built the label from `tariff_is_proxy` alone. No test covered the page's text; it was caught
+   while looking at the old screenshot before replacing it. The API now serves each site's tariff
+   name (`tariff`, from the committed tariff files), the page shows it, and an API regression test
+   checks every site's label.
+2. *The page's explanation list was hard-coded to the proxy sentence,* which no longer exists, and
+   never showed the all-sites demand-charge sentence. It now shows that sentence instead.
+3. *Screenshot:* `docs/m5/map_page.png` re-taken with Playwright at 2× (Leaflet 1.9.4 served from
+   the npm registry copy, whose SRI hashes match the page's pinned ones; map tiles blocked, as
+   before). Checked: 40 pins, no page errors, current headline and tariff label.

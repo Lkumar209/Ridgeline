@@ -17,7 +17,8 @@ state, results, gotchas, and what is left. Read it top to bottom once. After tha
 - **Done:** M0–M7, plus follow-ups and download retries. CI is green.
 - **M6 (LLM agent layer) is done** (ADR-014): 11/11 evals offline and live on claude-opus-5-5
   (the first live run was 9/11; fixes in AI_LOG "M6 live run").
-- **PRs:** #1–#5 merged. The live-eval fixes are on branch `claude/dazzling-cori-pty3ol` in a new PR.
+- **PRs:** #1–#6 merged (#6: G-3 and the live-eval fixes). Later polish (map tariff labels, fresh
+  screenshot) is on branch `claude/dazzling-cori-pty3ol` in a new PR.
 - **G-3 done (ADR-016):** the 23 sites above 200 kW are on MECo's real G-3 time-of-use rate; no
   proxies remain. Optional next step: 2026 rates (§8). (Former note follows.)
   Former open item: a real G-3 tariff for the 23 proxy sites (§8), which needs the user's URDB
@@ -114,15 +115,16 @@ All of this is met.
 
 | Item | State |
 |---|---|
-| `main` | `8ac1fcf` (merge of PR #4). Contains M0–M5 + M7 + the M4 follow-up. |
+| `main` | `8582d09` (merge of PR #6). Contains M0–M7, download retries, the M6 live-eval fixes and G-3. |
 | Working branch | `claude/dazzling-cori-pty3ol`. All commits pushed; local == remote. |
 | PR #1 | M0–M2. Merged. |
 | PR #2 | M3. Merged. |
 | PR #3 | M4 (+ CI workflow, M2 refresh). Merged. |
 | PR #4 | M4 follow-up + M5 + M7. Merged. |
-| **PR #5** | **Open.** Clarity fixes (`75a6730`, `14dca5f`), HANDOFF.md, download retries, M6. |
+| PR #5 | Clarity fixes, HANDOFF.md, download retries, M6. Merged. |
+| PR #6 | M6 live-eval fixes + real G-3 tariff (ADR-016). Merged. |
 | CI | `.github/workflows/check.yml`: `uv sync --locked` then `make check` on every push and PR. Offline. Green. |
-| Tests | 232 (unit, property, golden, e2e, api, agent). |
+| Tests | 241 (unit, property, golden, e2e, api, agent). |
 | Tracked files | ~125. Code is ~3,700 lines of Python in `src/`. |
 
 **Download retries** now exist (ADR-015): `data/cache.py` retries connection errors, timeouts,
@@ -459,7 +461,10 @@ make demo           # fetch + rank + serve (http://127.0.0.1:8000)
 
 ## 8. Open items and remaining work (prioritized)
 
-1. **Merge the live-eval PR** (user action), then restart the branch from `origin/main`.
+1. **Nothing is required.** After any merged PR, restart the branch from `origin/main`.
+   Optional: re-run `uv run ridgeline evals --live` on the explanation cases rebuilt for G-3
+   (offline 11/11; not yet run live). The user should regenerate the Anthropic and OpenEI keys
+   pasted in chat.
 2. **M6 live check: done** (11/11 on claude-opus-5-5). The user's key was pasted into chat and
    should be revoked in the Console; never ask for keys in chat (use the credential form).
 3. **G-3: done** (ADR-016; the user supplied an OpenEI key, `api.openei.org` and
